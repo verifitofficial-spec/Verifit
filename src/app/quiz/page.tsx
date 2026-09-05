@@ -2,6 +2,7 @@
 
 import { useEffect, useState } from 'react';
 import Link from 'next/link';
+import { useRouter } from 'next/navigation';
 import { supabase } from '@/app/lib/supabase';
 
 type Trainer = {
@@ -44,6 +45,7 @@ const MASTER_GOAL_BLOCKS = [
 ];
 
 export default function QuizPage() {
+  const router = useRouter();
   const [trainers, setTrainers] = useState<Trainer[]>([]);
   const [loading, setLoading] = useState(true);
 
@@ -197,6 +199,12 @@ export default function QuizPage() {
           {view === 'quiz' && step <= 4 && (
             <span className="text-xs text-slate-400 font-medium">Schritt {step} von 4</span>
           )}
+          <button
+            onClick={() => router.push('/')}
+            className="text-xs bg-slate-900 border border-slate-800 hover:bg-slate-800 text-slate-300 px-3 py-1.5 rounded-xl transition cursor-pointer flex items-center gap-1.5"
+          >
+            <span>&times;</span> Quiz verlassen
+          </button>
         </div>
       </header>
 

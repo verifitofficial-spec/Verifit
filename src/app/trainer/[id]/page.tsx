@@ -67,7 +67,6 @@ export default function TrainerPublicProfile() {
     if (error) {
       alert('Fehler bei der Buchung: ' + error.message);
     } else {
-      // Automatische E-Mail-Benachrichtigung an den Trainer auslösen
       await fetch('/api/send-email', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
@@ -159,6 +158,32 @@ export default function TrainerPublicProfile() {
               <p className="text-sm text-slate-300 whitespace-pre-line leading-relaxed">{trainer.bio || 'Keine Biografie vorhanden.'}</p>
             </div>
           </div>
+
+          {/* Social Media Links Sektion */}
+          {(trainer.instagram_url || trainer.tiktok_url) && (
+            <div className="flex gap-3 pt-4 border-t border-slate-800">
+              {trainer.instagram_url && (
+                <a 
+                  href={trainer.instagram_url} 
+                  target="_blank" 
+                  rel="noopener noreferrer" 
+                  className="text-xs bg-slate-950 hover:bg-slate-800 border border-slate-800 text-slate-300 px-4 py-2 rounded-xl transition flex items-center gap-2"
+                >
+                  Instagram ↗
+                </a>
+              )}
+              {trainer.tiktok_url && (
+                <a 
+                  href={trainer.tiktok_url} 
+                  target="_blank" 
+                  rel="noopener noreferrer" 
+                  className="text-xs bg-slate-950 hover:bg-slate-800 border border-slate-800 text-slate-300 px-4 py-2 rounded-xl transition flex items-center gap-2"
+                >
+                  TikTok ↗
+                </a>
+              )}
+            </div>
+          )}
 
           {trainer.package_category && (
             <div className="bg-slate-950 border border-slate-800 rounded-xl p-5 flex flex-col md:flex-row justify-between items-start md:items-center gap-4">

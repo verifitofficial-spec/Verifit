@@ -5,7 +5,7 @@ import { useRouter } from 'next/navigation';
 import Link from 'next/link';
 import { supabase } from '@/app/lib/supabase';
 
-export default function RegisterPage() {
+export default function TrainerRegisterPage() {
   const [name, setName] = useState('');
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
@@ -19,7 +19,6 @@ export default function RegisterPage() {
     setLoading(true);
     setErrorMessage('');
 
-    // 1. In Supabase Auth registrieren
     const { data: authData, error: authError } = await supabase.auth.signUp({
       email,
       password,
@@ -31,7 +30,6 @@ export default function RegisterPage() {
       return;
     }
 
-    // 2. Eintrag in der 'trainers' Tabelle erstellen
     const { error: dbError } = await supabase.from('trainers').insert([
       {
         name,
@@ -47,7 +45,6 @@ export default function RegisterPage() {
       return;
     }
 
-    // Erfolgreich weiterleiten ins Dashboard
     router.push('/trainers');
   }
 
@@ -58,7 +55,7 @@ export default function RegisterPage() {
           VERIFIT<span className="text-white">.</span>
         </Link>
         <Link href="/" className="text-sm font-medium text-slate-300 hover:text-white transition">
-          ← Zurück zur Startseite
+          &larr; Zurück zur Startseite
         </Link>
       </header>
 
@@ -141,7 +138,7 @@ export default function RegisterPage() {
 
           <div className="mt-6 text-center text-xs text-slate-500">
             Bereits ein Konto?{' '}
-            <Link href="/login" className="text-emerald-400 hover:underline">
+            <Link href="/trainer/login" className="text-emerald-400 hover:underline">
               Anmelden
             </Link>
           </div>
