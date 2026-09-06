@@ -17,7 +17,7 @@ export default function LoginPage() {
     setLoading(true);
     setErrorMessage('');
 
-    const { error } = await supabase.auth.signInWithPassword({
+    const { data, error } = await supabase.auth.signInWithPassword({
       email,
       password,
     });
@@ -26,7 +26,13 @@ export default function LoginPage() {
       setErrorMessage(error.message);
       setLoading(false);
     } else {
-      router.push('/trainers');
+      const user = data.user;
+      if (user) {
+        // Leitet zum dynamischen Dashboard mit der echten Trainer-ID weiter
+        router.push(`/trainer/${user.id}/dashboard`);
+      } else {
+        router.push('/trainer/list');
+      }
     }
   }
 

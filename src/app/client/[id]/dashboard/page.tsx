@@ -1,48 +1,41 @@
 'use client';
 
-import { useState } from 'react';
+import { useEffect, useState, use } from 'react';
+import { useRouter } from 'next/navigation';
 import Link from 'next/link';
 import { supabase } from '@/app/lib/supabase';
+import Chat from '@/components/Chat';
 
-export default function ClientDashboard() {
-  const [email, setEmail] = useState('');
+export default function ClientDashboard({ params }: { params: Promise<{ id: string }> }) {
+  const resolvedParams = use(params);
+  const clientId = resolvedParams.id;
+
   const [client, setClient] = useState<any>(null);
   const [mySlots, setMySlots] = useState<any[]>([]);
-  const [loading, setLoading] = useState(false);
-  const [message, setMessage] = useState('');
+  const [loading, setLoading] = useState(true);
+  const router = useRouter();
 
-  async function handleLogin(e: React.FormEvent) {
-    e.preventDefault();
-    if (!email) return;
-    setLoading(true);
-    setMessage('');
-
-    // Prüfen ob Kunde existiert, sonst automatisch anlegen
-    let { data: clientData } = await supabase
-      .from('clients')
-      .select('*')
-      .eq('email', email)
-      .single();
-
-    if (!clientData) {
-      const { data: newClient, error } = await supabase
+  useEffect(() => {
+    async function loadClientData() {
+      // 1. Kundendaten anhand der ID aus der URL laden
+      const { data: clientData, error: clientError } = await supabase
         .from('clients')
-        .insert({ email, name: email.split('@')[0] })
-        .select()
+        .select('*')
+        .eq('id', clientId)
         .single();
-      
-      if (error) {
-        setMessage('Fehler beim Login: ' + error.message);
-        setLoading(false);
+
+      if (clientError || !clientData) {
+        router.push('/client/login');
         return;
       }
-      clientData = newClient;
+
+      setClient(clientData);
+      loadClientSlots(clientData.email);
+      setLoading(false);
     }
 
-    setClient(clientData);
-    loadClientSlots(email);
-    setLoading(false);
-  }
+    loadClientData();
+  }, [clientId, router]);
 
   async function loadClientSlots(clientEmail: string) {
     const { data } = await supabase
@@ -71,74 +64,45 @@ export default function ClientDashboard() {
     }
   }
 
+  async function handleLogout() {
+    await supabase.auth.signOut();
+    router.push('/client/login');
+  }
+
+  if (loading) {
+    return (
+      <div className="min-h-screen bg-slate-950 text-white flex items-center justify-center">
+        <p className="text-sm text-slate-400">Lade Dashboard...</p>
+      </div>
+    );
+  }
+
   return (
     <main className="min-h-screen bg-slate-950 text-white flex flex-col justify-between">
       <header className="flex justify-between items-center px-6 py-6 max-w-7xl mx-auto w-full border-b border-slate-900">
         <Link href="/" className="text-2xl font-black tracking-wider text-emerald-400">
           VERIFIT<span className="text-white">.</span> <span className="text-xs text-slate-400 font-normal">Kunden-Portal</span>
         </Link>
-        <Link
-          href="/"
-          className="text-xs bg-slate-900 hover:bg-slate-800 text-slate-300 px-4 py-2 rounded-xl transition border border-slate-800"
+        <button
+          onClick={handleLogout}
+          className="text-xs bg-slate-900 hover:bg-slate-800 text-slate-300 px-4 py-2 rounded-xl transition border border-slate-800 cursor-pointer"
         >
-          &larr; Zurück zur Startseite
-        </Link>
+          Abmelden
+        </button>
       </header>
 
       <section className="max-w-3xl mx-auto px-6 py-12 w-full flex-1 space-y-8">
-        {!client ? (
-          <div className="bg-slate-900 border border-slate-800 rounded-3xl p-8 shadow-2xl space-y-6 max-w-md mx-auto">
-            <div>
-              <h1 className="text-2xl font-extrabold mb-1">Kunden-Anmeldung</h1>
-              <p className="text-slate-400 text-sm">
-                Gib deine E-Mail-Adresse ein, um deine angefragten und gebuchten Trainingstermine einzusehen.
-              </p>
-            </div>
-
-            {message && (
-              <p className="text-xs text-red-400 bg-red-500/10 p-3 rounded-xl border border-red-500/25">{message}</p>
-            )}
-
-            <form onSubmit={handleLogin} className="space-y-4">
-              <div>
-                <label className="block text-xs font-semibold text-slate-400 uppercase tracking-wider mb-2">
-                  E-Mail-Adresse
-                </label>
-                <input
-                  type="email"
-                  value={email}
-                  onChange={(e) => setEmail(e.target.value)}
-                  placeholder="deine@email.de"
-                  className="w-full bg-slate-950 border border-slate-800 rounded-xl px-4 py-3 text-sm text-white focus:outline-none focus:border-emerald-500"
-                  required
-                />
-              </div>
-
-              <button
-                type="submit"
-                disabled={loading}
-                className="w-full bg-emerald-500 hover:bg-emerald-600 text-slate-950 font-bold py-3.5 rounded-xl text-sm transition shadow-lg shadow-emerald-500/20 cursor-pointer"
-              >
-                {loading ? 'Lade...' : 'Termine anzeigen'}
-              </button>
-            </form>
-          </div>
-        ) : (
+        <div className="space-y-8">
           <div className="bg-slate-900 border border-slate-800 rounded-3xl p-8 shadow-2xl space-y-6">
             <div className="flex justify-between items-center border-b border-slate-800 pb-6">
               <div>
-                <h1 className="text-2xl font-extrabold">Deine gebuchten Termine</h1>
+                <h1 className="text-2xl font-extrabold">Willkommen, {client.name}</h1>
                 <p className="text-slate-400 text-sm">Angemeldet als: {client.email}</p>
               </div>
-              <button
-                onClick={() => setClient(null)}
-                className="text-xs bg-slate-950 hover:bg-slate-800 text-slate-300 px-4 py-2 rounded-xl border border-slate-800 cursor-pointer"
-              >
-                Abmelden
-              </button>
             </div>
 
             <div className="space-y-4">
+              <h2 className="text-lg font-bold">Deine gebuchten Termine</h2>
               {mySlots.length === 0 ? (
                 <p className="text-xs text-slate-500">Du hast bisher keine Termine angefragt.</p>
               ) : (
@@ -178,7 +142,18 @@ export default function ClientDashboard() {
               )}
             </div>
           </div>
-        )}
+
+          {/* Integrierter Echtzeit-Chat für den Kunden */}
+          <div className="bg-slate-900 border border-slate-800 rounded-3xl p-8 shadow-2xl space-y-6">
+            <div>
+              <h2 className="text-xl font-extrabold mb-1">Nachrichten & Chat</h2>
+              <p className="text-slate-400 text-sm">
+                Schreibe direkt mit deinen Trainern.
+              </p>
+            </div>
+            <Chat currentUserId={client.id} />
+          </div>
+        </div>
       </section>
 
       <footer className="border-t border-slate-900 py-6 text-center text-xs text-slate-600 max-w-7xl mx-auto w-full">

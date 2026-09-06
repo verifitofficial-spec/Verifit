@@ -3,15 +3,55 @@
 import { useState } from 'react';
 import { useRouter } from 'next/navigation';
 import Link from 'next/link';
+import { supabase } from '@/app/lib/supabase';
 
 export default function ClientRegisterPage() {
-  const [email, setEmail] = useState('');
   const [name, setName] = useState('');
+  const [email, setEmail] = useState('');
+  const [password, setPassword] = useState('');
+  const [loading, setLoading] = useState(false);
+  const [errorMessage, setErrorMessage] = useState('');
   const router = useRouter();
 
   async function handleRegister(e: React.FormEvent) {
     e.preventDefault();
-    router.push('/client/dashboard');
+    setLoading(true);
+    setErrorMessage('');
+
+    const { data: authData, error: authError } = await supabase.auth.signUp({
+      email,
+      password,
+    });
+
+    if (authError) {
+      setErrorMessage(authError.message);
+      setLoading(false);
+      return;
+    }
+
+    const user = authData.user;
+
+    if (user) {
+      const { error: clientError } = await supabase.from('clients').insert([
+        {
+          id: user.id,
+          name,
+          email,
+        },
+      ]);
+
+      if (clientError) {
+        setErrorMessage('Fehler beim Speichern des Profils: ' + clientError.message);
+        setLoading(false);
+        return;
+      }
+
+      // Direkte Weiterleitung mit Template-Literal
+      router.push(`/client/${user.id}/dashboard`);
+    } else {
+      setErrorMessage('Registrierung fehlgeschlagen.');
+      setLoading(false);
+    }
   }
 
   return (
@@ -28,13 +68,22 @@ export default function ClientRegisterPage() {
       <section className="flex flex-col items-center justify-center px-6 py-12 max-w-md mx-auto w-full flex-1">
         <div className="w-full bg-slate-900 border border-slate-800 rounded-2xl p-8 shadow-2xl">
           <h1 className="text-2xl font-extrabold mb-2 text-center">Kunden-Registrierung</h1>
-          <p className="text-slate-400 text-sm text-center mb-6">Erstelle dein Profil für Buchungen.</p>
+          <p className="text-slate-400 text-sm text-center mb-6">Erstelle dein Konto, um Termine zu buchen.</p>
+
+          {errorMessage && (
+            <div className="mb-4 p-3 bg-red-500/10 border border-red-500/20 rounded-xl text-red-400 text-xs">
+              {errorMessage}
+            </div>
+          )}
 
           <form onSubmit={handleRegister} className="space-y-4">
             <div>
-              <label className="block text-xs font-semibold text-slate-400 uppercase tracking-wider mb-2">Name</label>
+              <label className="block text-xs font-semibold text-slate-400 uppercase tracking-wider mb-2">
+                Vollständiger Name
+              </label>
               <input
                 type="text"
+                placeholder="Max Mustermann"
                 value={name}
                 onChange={(e) => setName(e.target.value)}
                 className="w-full bg-slate-950 border border-slate-800 rounded-xl px-4 py-3 text-sm text-white focus:outline-none focus:border-emerald-500"
@@ -42,22 +91,46 @@ export default function ClientRegisterPage() {
               />
             </div>
             <div>
-              <label className="block text-xs font-semibold text-slate-400 uppercase tracking-wider mb-2">E-Mail</label>
+              <label className="block text-xs font-semibold text-slate-400 uppercase tracking-wider mb-2">
+                E-Mail-Adresse
+              </label>
               <input
                 type="email"
+                placeholder="name@example.com"
                 value={email}
                 onChange={(e) => setEmail(e.target.value)}
                 className="w-full bg-slate-950 border border-slate-800 rounded-xl px-4 py-3 text-sm text-white focus:outline-none focus:border-emerald-500"
                 required
               />
             </div>
+            <div>
+              <label className="block text-xs font-semibold text-slate-400 uppercase tracking-wider mb-2">
+                Passwort
+              </label>
+              <input
+                type="password"
+                placeholder="••••••••"
+                value={password}
+                onChange={(e) => setPassword(e.target.value)}
+                className="w-full bg-slate-950 border border-slate-800 rounded-xl px-4 py-3 text-sm text-white focus:outline-none focus:border-emerald-500"
+                required
+              />
+            </div>
             <button
               type="submit"
+              disabled={loading}
               className="w-full bg-emerald-500 hover:bg-emerald-600 text-slate-950 font-bold py-3 rounded-xl text-sm transition cursor-pointer"
             >
-              Registrieren
+              {loading ? 'Erstelle Konto...' : 'Registrieren'}
             </button>
           </form>
+
+          <div className="mt-6 text-center text-xs text-slate-500">
+            Bereits ein Konto?{' '}
+            <Link href="/client/login" className="text-emerald-400 hover:underline">
+              Jetzt anmelden
+            </Link>
+          </div>
         </div>
       </section>
 

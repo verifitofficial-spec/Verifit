@@ -7,20 +7,13 @@ export default function HomePage() {
         <Link href="/" className="text-2xl font-black tracking-wider text-emerald-400">
           VERIFIT<span className="text-white">.</span>
         </Link>
-        <div className="flex items-center gap-6">
-          <div className="flex items-center gap-4 border-r border-slate-800 pr-6">
-            <Link href="/client/dashboard" className="text-sm font-medium text-slate-300 hover:text-white transition">
-              Kunden-Login
-            </Link>
-          </div>
-          <div className="flex items-center gap-4">
-            <Link href="/trainer/login" className="text-sm font-medium text-slate-300 hover:text-white transition">
-              Trainer Login
-            </Link>
-            <Link href="/trainer/register" className="bg-emerald-500 hover:bg-emerald-600 text-slate-950 font-semibold px-4 py-2 rounded-xl text-sm transition">
-              Als Trainer registrieren
-            </Link>
-          </div>
+        <div className="flex items-center gap-4">
+          <Link href="/login" className="text-sm font-medium text-slate-300 hover:text-white transition">
+            Login
+          </Link>
+          <Link href="/register" className="bg-emerald-500 hover:bg-emerald-600 text-slate-950 font-semibold px-4 py-2 rounded-xl text-sm transition">
+            Registrieren
+          </Link>
         </div>
       </header>
 

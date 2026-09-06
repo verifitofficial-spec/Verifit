@@ -4,6 +4,7 @@ import { useEffect, useState } from 'react';
 import { useRouter } from 'next/navigation';
 import Link from 'next/link';
 import { supabase } from '@/app/lib/supabase';
+import Chat from '@/components/Chat';
 
 const AVAILABLE_SPECIALTIES = [
   'Athletiktraining',
@@ -235,7 +236,6 @@ export default function TrainerDashboard() {
     router.push('/login');
   }
 
-  // Kalender Monatslogik generieren
   const year = currentDate.getFullYear();
   const month = currentDate.getMonth();
   const monthNames = ["Januar", "Februar", "März", "April", "Mai", "Juni", "Juli", "August", "September", "Oktober", "November", "Dezember"];
@@ -305,6 +305,19 @@ export default function TrainerDashboard() {
       </header>
 
       <section className="max-w-5xl mx-auto px-6 py-12 w-full flex-1 space-y-8">
+        
+        {/* Chat-Sektion direkt im Trainer-Dashboard */}
+        <div className="bg-slate-900 border border-slate-800 rounded-2xl p-8 shadow-2xl space-y-6">
+          <div>
+            <h2 className="text-xl font-extrabold mb-1">Kunden-Chat & Nachrichten</h2>
+            <p className="text-slate-400 text-sm">
+              Kommuniziere in Echtzeit mit deinen Kunden und Anfragenden.
+            </p>
+          </div>
+          {trainer && <Chat currentUserId={trainer.id} />}
+        </div>
+
+        {/* Profil-Formular */}
         <div className="bg-slate-900 border border-slate-800 rounded-2xl p-8 shadow-2xl space-y-6">
           <div>
             <h1 className="text-2xl font-extrabold mb-1">Trainer Master-Profil & Sicherheit</h1>
@@ -412,13 +425,12 @@ export default function TrainerDashboard() {
               </div>
             </div>
 
-            {/* Spezialgebiete Game-Style Auswahl & Anzeige (Alphabetisch sortiert & umfassend) */}
+            {/* Spezialgebiete Game-Style Auswahl */}
             <div className="space-y-4">
               <label className="block text-xs font-semibold uppercase tracking-wider text-slate-400">
                 Spezialgebiete & Kernkompetenzen (Klicken zum Auswählen)
               </label>
 
-              {/* Oben: Alle verfügbaren Skills als auswählbare Kacheln (Alphabetisch sortiert) */}
               <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 gap-2">
                 {AVAILABLE_SPECIALTIES.map((spec) => {
                   const isSelected = selectedSpecialties.includes(spec);
@@ -446,7 +458,6 @@ export default function TrainerDashboard() {
                 })}
               </div>
 
-              {/* Unten: Aktive Auswahl mit X zum Entfernen */}
               <div className="space-y-2 pt-2">
                 <span className="block text-[11px] font-semibold uppercase tracking-wider text-slate-500">
                   Aktuell ausgewählt:
@@ -548,7 +559,7 @@ export default function TrainerDashboard() {
           </form>
         </div>
 
-        {/* Plattforminterner Kalender in Spalten- / Gitteransicht */}
+        {/* Kalender-Sektion */}
         <div className="bg-slate-900 border border-slate-800 rounded-2xl p-8 shadow-2xl space-y-6">
           <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-4">
             <div>
@@ -587,7 +598,6 @@ export default function TrainerDashboard() {
             </div>
           </div>
 
-          {/* Schnell-Eintragungsformular mit verknüpften Angebotspaketen */}
           <form onSubmit={handleAddSlot} className="grid grid-cols-1 md:grid-cols-4 gap-4 items-end bg-slate-950 p-4 rounded-xl border border-slate-800">
             <div>
               <label className="block text-xs font-semibold text-slate-400 uppercase tracking-wider mb-2">
@@ -663,7 +673,7 @@ export default function TrainerDashboard() {
             </button>
           </form>
 
-          {/* Kalender Spaltenraster (Mo-So) */}
+          {/* Kalender Spaltenraster */}
           <div className="overflow-x-auto">
             <div className="min-w-[700px] grid grid-cols-7 gap-px bg-slate-800 border border-slate-800 rounded-xl overflow-hidden">
               {['Mo', 'Di', 'Mi', 'Do', 'Fr', 'Sa', 'So'].map((dayName, idx) => (
@@ -748,36 +758,61 @@ export default function TrainerDashboard() {
       {/* Multi-Tages-Modal */}
       {isMultiOpen && (
         <div className="fixed inset-0 bg-slate-950/80 backdrop-blur-sm flex items-center justify-center p-4 z-50">
-          <form onSubmit={handleCreateMultiSlots} className="bg-slate-900 border border-slate-800 rounded-2xl max-w-md w-full p-6 space-y-4 shadow-2xl">
-            <div className="flex justify-between items-center">
-              <h3 className="text-base font-bold text-white">Mehrere Tage belegen</h3>
-              <button type="button" onClick={() => setIsMultiOpen(false)} className="text-slate-400 hover:text-white text-lg cursor-pointer">&times;</button>
+          <form onSubmit={handleCreateMultiSlots} className="bg-slate-900 border border-slate-800 rounded-2xl max-w-md w-full p-6 space-y-4">
+            <h3 className="text-lg font-bold">Multi-Tages-Slots generieren</h3>
+            <p className="text-slate-400 text-xs">Erstelle schnell gleiche Uhrzeiten über einen Zeitraum hinweg.</p>
+            
+            <div>
+              <label className="block text-xs font-semibold text-slate-400 uppercase tracking-wider mb-2">Startdatum</label>
+              <input
+                type="date"
+                value={multiStart}
+                onChange={(e) => setMultiStart(e.target.value)}
+                className="w-full bg-slate-950 border border-slate-800 rounded-xl px-4 py-2.5 text-sm text-white"
+                required
+              />
             </div>
-            <div className="space-y-3 text-xs">
-              <div>
-                <label className="block text-slate-400 mb-1 font-semibold">Von Datum:</label>
-                <input type="date" required value={multiStart} onChange={e => setMultiStart(e.target.value)} className="w-full bg-slate-950 border border-slate-800 rounded-xl p-3 text-white" />
-              </div>
-              <div>
-                <label className="block text-slate-400 mb-1 font-semibold">Bis Datum (inklusive):</label>
-                <input type="date" required value={multiEnd} onChange={e => setMultiEnd(e.target.value)} className="w-full bg-slate-950 border border-slate-800 rounded-xl p-3 text-white" />
-              </div>
-              <div>
-                <label className="block text-slate-400 mb-1 font-semibold">Uhrzeit für alle Tage:</label>
-                <input type="time" required value={multiTime} onChange={e => setMultiTime(e.target.value)} className="w-full bg-slate-950 border border-slate-800 rounded-xl p-3 text-white" />
-              </div>
+
+            <div>
+              <label className="block text-xs font-semibold text-slate-400 uppercase tracking-wider mb-2">Enddatum</label>
+              <input
+                type="date"
+                value={multiEnd}
+                onChange={(e) => setMultiEnd(e.target.value)}
+                className="w-full bg-slate-950 border border-slate-800 rounded-xl px-4 py-2.5 text-sm text-white"
+                required
+              />
             </div>
-            <div className="flex justify-end gap-2 pt-2">
-              <button type="button" onClick={() => setIsMultiOpen(false)} className="bg-slate-800 hover:bg-slate-700 text-white px-4 py-2 rounded-xl text-xs font-bold cursor-pointer">Abbrechen</button>
-              <button type="submit" className="bg-emerald-500 hover:bg-emerald-600 text-slate-950 px-4 py-2 rounded-xl text-xs font-bold cursor-pointer">Generieren</button>
+
+            <div>
+              <label className="block text-xs font-semibold text-slate-400 uppercase tracking-wider mb-2">Uhrzeit</label>
+              <input
+                type="time"
+                value={multiTime}
+                onChange={(e) => setMultiTime(e.target.value)}
+                className="w-full bg-slate-950 border border-slate-800 rounded-xl px-4 py-2.5 text-sm text-white"
+                required
+              />
+            </div>
+
+            <div className="flex justify-end gap-3 pt-2">
+              <button
+                type="button"
+                onClick={() => setIsMultiOpen(false)}
+                className="bg-slate-800 hover:bg-slate-700 text-slate-300 px-4 py-2 rounded-xl text-xs font-bold cursor-pointer"
+              >
+                Abbrechen
+              </button>
+              <button
+                type="submit"
+                className="bg-emerald-500 hover:bg-emerald-600 text-slate-950 px-4 py-2 rounded-xl text-xs font-bold cursor-pointer"
+              >
+                Generieren
+              </button>
             </div>
           </form>
         </div>
       )}
-
-      <footer className="border-t border-slate-900 py-6 text-center text-xs text-slate-600 max-w-7xl mx-auto w-full">
-        &copy; {new Date().getFullYear()} VeriFit. Alle Rechte vorbehalten.
-      </footer>
     </main>
   );
 }
