@@ -132,29 +132,65 @@ export default function TrainerPublicProfile() {
         )}
 
         <div className="bg-slate-900 border border-slate-800 rounded-2xl p-8 shadow-2xl space-y-6">
-          <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-4">
-            <div>
-              <div className="flex items-center gap-3 mb-2">
-                <h1 className="text-3xl font-extrabold">{trainer.name}</h1>
-                <span className="text-xs bg-emerald-500/10 border border-emerald-500/30 text-emerald-400 px-3 py-1 rounded-full font-bold">
-                  Verifiziert ✓
-                </span>
+          <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-6">
+            <div className="flex items-center gap-5">
+              {/* Profilbild / Avatar */}
+              <div className="w-20 h-20 rounded-2xl bg-slate-800 border border-slate-700 flex items-center justify-center text-2xl font-bold text-emerald-400 overflow-hidden shrink-0 shadow-inner">
+                {trainer.avatar_url ? (
+                  <img src={trainer.avatar_url} alt={trainer.name} className="w-full h-full object-cover" />
+                ) : (
+                  <span>{trainer.name ? trainer.name.charAt(0) : 'T'}</span>
+                )}
               </div>
-              <p className="text-slate-400 text-sm">{trainer.city || 'Standort flexibel'} &bull; <span className="text-emerald-400">{trainer.service_mode}</span></p>
+              
+              <div>
+                <div className="flex items-center gap-3 mb-1">
+                  <h1 className="text-3xl font-extrabold">{trainer.name}</h1>
+                  <span className="text-xs bg-emerald-500/10 border border-emerald-500/30 text-emerald-400 px-3 py-1 rounded-full font-bold">
+                    Verifiziert ✓
+                  </span>
+                </div>
+                <p className="text-slate-400 text-sm">
+                  {trainer.city || 'Standort flexibel'} &bull; <span className="text-emerald-400 font-medium">{trainer.service_mode || 'Hybrid'}</span>
+                </p>
+              </div>
             </div>
-            <div className="bg-slate-950 border border-slate-800 px-4 py-3 rounded-xl text-right">
-              <span className="block text-[10px] text-slate-400 uppercase tracking-wider">Status</span>
-              <span className="text-xs font-bold text-emerald-400">{trainer.availability_status === 'available' ? 'Sofort verfügbar' : 'Warteliste'}</span>
+            
+            {/* Preistransparenz: Stundensatz / Basis */}
+            <div className="bg-slate-950 border border-slate-800 px-5 py-3.5 rounded-xl text-right w-full md:w-auto">
+              <span className="block text-[10px] text-slate-400 uppercase tracking-wider">Stundensatz / Basis</span>
+              <span className="text-sm font-bold text-emerald-400">{trainer.hourly_rate ? `${trainer.hourly_rate} € / Std.` : 'Auf Anfrage'}</span>
             </div>
           </div>
 
-          <div className="border-t border-slate-800 pt-6 space-y-4">
+          <div className="border-t border-slate-800 pt-6 space-y-6">
             <div>
-              <h3 className="text-xs font-semibold text-slate-400 uppercase tracking-wider mb-1">Spezialgebiete</h3>
-              <p className="text-sm font-medium text-slate-200">{trainer.specialties || 'Keine Angaben hinterlegt'}</p>
+              <h3 className="text-xs font-semibold text-slate-400 uppercase tracking-wider mb-2">Fachgebiete & Spezialisierungen</h3>
+              <div className="flex flex-wrap gap-2">
+                {trainer.specialties ? (
+                  trainer.specialties.split(',').map((spec: string, idx: number) => (
+                    <span key={idx} className="bg-slate-950 border border-slate-800 text-emerald-400 text-xs px-3 py-1 rounded-lg font-medium">
+                      {spec.trim()}
+                    </span>
+                  ))
+                ) : (
+                  <p className="text-sm text-slate-300">Keine Angaben hinterlegt</p>
+                )}
+              </div>
             </div>
+
+            {/* Qualifikationen aus dem Dashboard */}
+            {trainer.qualifications && (
+              <div>
+                <h3 className="text-xs font-semibold text-slate-400 uppercase tracking-wider mb-2">Qualifikationen & Zertifikate</h3>
+                <p className="text-sm text-slate-300 whitespace-pre-line leading-relaxed bg-slate-950 p-4 rounded-xl border border-slate-800">
+                  {trainer.qualifications}
+                </p>
+              </div>
+            )}
+
             <div>
-              <h3 className="text-xs font-semibold text-slate-400 uppercase tracking-wider mb-1">Über mich & Philosophie</h3>
+              <h3 className="text-xs font-semibold text-slate-400 uppercase tracking-wider mb-2">Über mich & Philosophie</h3>
               <p className="text-sm text-slate-300 whitespace-pre-line leading-relaxed">{trainer.bio || 'Keine Biografie vorhanden.'}</p>
             </div>
           </div>
@@ -185,20 +221,23 @@ export default function TrainerPublicProfile() {
             </div>
           )}
 
+          {/* Hauptpaket & Preistransparenz */}
           {trainer.package_category && (
             <div className="bg-slate-950 border border-slate-800 rounded-xl p-5 flex flex-col md:flex-row justify-between items-start md:items-center gap-4">
               <div>
-                <span className="text-[10px] bg-emerald-500/10 text-emerald-400 px-2 py-0.5 rounded font-bold uppercase">Hauptpaket</span>
+                <span className="text-[10px] bg-emerald-500/10 text-emerald-400 px-2 py-0.5 rounded font-bold uppercase">Empfohlenes Paket</span>
                 <h4 className="text-base font-bold mt-1">{trainer.package_category}</h4>
                 <p className="text-xs text-slate-400">Laufzeit: {trainer.package_duration || 'Individuell'}</p>
               </div>
               <div className="text-right">
                 <span className="text-xl font-black text-emerald-400">{trainer.package_price ? `${trainer.package_price} €` : 'Auf Anfrage'}</span>
+                <span className="block text-[10px] text-slate-500 mt-0.5">Buchung nach Erstgespräch</span>
               </div>
             </div>
           )}
         </div>
 
+        {/* Freie Termine & Slots */}
         <div className="bg-slate-900 border border-slate-800 rounded-2xl p-8 shadow-2xl space-y-6">
           <div>
             <h2 className="text-xl font-extrabold mb-1">Verfügbare Termine & Slots</h2>
@@ -232,6 +271,7 @@ export default function TrainerPublicProfile() {
         </div>
       </section>
 
+      {/* Modal für Buchungsanfrage */}
       {bookingSlot && (
         <div className="fixed inset-0 bg-slate-950/80 backdrop-blur-sm flex items-center justify-center p-4 z-50">
           <form onSubmit={handleBooking} className="bg-slate-900 border border-slate-800 rounded-2xl max-w-md w-full p-6 space-y-4 shadow-2xl">

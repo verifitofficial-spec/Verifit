@@ -21,6 +21,11 @@ export default function ClientRegisterPage() {
     const { data: authData, error: authError } = await supabase.auth.signUp({
       email,
       password,
+      options: {
+        data: {
+          role: 'client', // Übergibt die Rolle an den Datenbank-Trigger für die profiles-Tabelle
+        },
+      },
     });
 
     if (authError) {

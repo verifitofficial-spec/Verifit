@@ -22,6 +22,11 @@ export default function TrainerRegisterPage() {
     const { data: authData, error: authError } = await supabase.auth.signUp({
       email,
       password,
+      options: {
+        data: {
+          role: 'trainer', // Übergibt die Rolle an den Datenbank-Trigger für die profiles-Tabelle
+        },
+      },
     });
 
     if (authError) {
@@ -30,19 +35,24 @@ export default function TrainerRegisterPage() {
       return;
     }
 
-    const { error: dbError } = await supabase.from('trainers').insert([
-      {
-        name,
-        email,
-        bio,
-        status: 'pending',
-      },
-    ]);
+    const user = authData.user;
 
-    if (dbError) {
-      setErrorMessage(dbError.message);
-      setLoading(false);
-      return;
+    if (user) {
+      const { error: dbError } = await supabase.from('trainers').insert([
+        {
+          id: user.id, // Verknüpft den Trainer direkt mit der Supabase Auth-ID
+          name,
+          email,
+          bio,
+          status: 'pending',
+        },
+      ]);
+
+      if (dbError) {
+        setErrorMessage(dbError.message);
+        setLoading(false);
+        return;
+      }
     }
 
     router.push('/trainers');

@@ -35,6 +35,20 @@ export default function ClientLoginPage() {
       return;
     }
 
+    // Sicherheitsprüfung: Prüfen, ob der User laut zentraler profiles-Tabelle ein Client ist
+    const { data: profileData, error: profileError } = await supabase
+      .from('profiles')
+      .select('role')
+      .eq('id', user.id)
+      .single();
+
+    if (profileError || !profileData || profileData.role !== 'client') {
+      await supabase.auth.signOut();
+      setErrorMessage('Zugriff verwehrt. Dieser Account ist kein Kunden-Konto.');
+      setLoading(false);
+      return;
+    }
+
     // Prüfen, ob ein Eintrag in 'clients' mit dieser Auth-ID existiert
     const { data: existingClient } = await supabase
       .from('clients')

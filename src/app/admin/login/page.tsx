@@ -14,15 +14,37 @@ export default function AdminLoginPage() {
     e.preventDefault();
     setErrorMsg('');
 
-    const { error } = await supabase.auth.signInWithPassword({
+    // 1. Ganz normal einloggen über Supabase Auth
+    const { data: authData, error: authError } = await supabase.auth.signInWithPassword({
       email,
       password,
     });
 
-    if (error) {
-      setErrorMsg(error.message);
-    } else {
-      router.push('/admin');
+    if (authError) {
+      setErrorMsg(authError.message);
+      return;
+    }
+
+    const user = authData.user;
+
+    if (user) {
+      // 2. Prüfen, ob der User in der 'profiles'-Tabelle die Rolle 'admin' hat
+      const { data: profile, error: profileError } = await supabase
+        .from('profiles')
+        .select('role')
+        .eq('id', user.id)
+        .single();
+
+      if (profileError || !profile || profile.role !== 'admin') {
+        // Wenn kein Admin: Sofort wieder ausloggen, damit kein unbefugter Zugriff möglich ist!
+        await supabase.auth.signOut();
+        setErrorMsg('Zugriff verwehrt. Dieser Account hat keine Administrator-Rechte.');
+        return;
+      }
+
+      // 3. Wenn alles passt, Session erzwingen und ins Admin-Dashboard weiterleiten
+      await router.push('/admin');
+      router.refresh();
     }
   };
 

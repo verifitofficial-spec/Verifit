@@ -28,8 +28,33 @@ export default function LoginPage() {
     } else {
       const user = data.user;
       if (user) {
-        // Leitet zum dynamischen Dashboard mit der echten Trainer-ID weiter
-        router.push(`/trainer/${user.id}/dashboard`);
+        // Sicherheitsprüfung: Prüfen, ob der User laut zentraler profiles-Tabelle ein Trainer ist
+        const { data: profileData, error: profileError } = await supabase
+          .from('profiles')
+          .select('role')
+          .eq('id', user.id)
+          .single();
+
+        if (profileError || !profileData || profileData.role !== 'trainer') {
+          await supabase.auth.signOut();
+          setErrorMessage('Zugriff verwehrt. Dieser Account ist kein Trainer-Konto.');
+          setLoading(false);
+          return;
+        }
+
+        // Wir holen die echte Trainer-ID anhand der E-Mail aus der trainers-Tabelle[cite: 7]
+        const { data: trainerData, error: trainerError } = await supabase
+          .from('trainers')
+          .select('id')
+          .eq('email', user.email)
+          .single();
+
+        if (trainerData) {
+          router.push(`/trainer/${trainerData.id}/dashboard`);
+        } else {
+          setErrorMessage('Kein Trainer-Profil zu diesem Account gefunden.');
+          setLoading(false);
+        }
       } else {
         router.push('/trainer/list');
       }
@@ -43,7 +68,7 @@ export default function LoginPage() {
           VERIFIT<span className="text-white">.</span>
         </Link>
         <Link href="/" className="text-sm font-medium text-slate-300 hover:text-white transition">
-          ← Zurück zur Startseite
+          &larr; Zurück zur Startseite
         </Link>
       </header>
 

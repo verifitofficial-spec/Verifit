@@ -64,6 +64,9 @@ export default function QuizPage() {
   const [bookingMessage, setBookingMessage] = useState('');
 
   const [activeTrainerKeywords, setActiveTrainerKeywords] = useState<string[]>([]);
+  
+  // Dynamische Preisspannen für Schritt 4
+  const [dynamicPriceRange, setDynamicPriceRange] = useState({ min: 0, max: 500 });
 
   useEffect(() => {
     async function fetchApprovedTrainers() {
@@ -106,9 +109,46 @@ export default function QuizPage() {
     setAnswers(updatedAnswers);
 
     if (step < 4) {
+      // Wenn wir von Schritt 3 zu Schritt 4 gehen, berechnen wir die passenden Preisspannen vorab
+      if (step === 3) {
+        calculateDynamicBudgetRange(updatedAnswers);
+      }
       setStep(prev => prev + 1);
     } else {
       executeMatching(updatedAnswers);
+    }
+  };
+
+  // Berechnet die echten min/max Preise basierend auf den bisherigen Auswahl-Filtern (Ziel & Modus)
+  const calculateDynamicBudgetRange = (currentAnswers: QuizAnswers) => {
+    let relevantTrainers = [...trainers];
+
+    if (currentAnswers.goal) {
+      relevantTrainers = relevantTrainers.filter(t => {
+        const goal = currentAnswers.goal.toLowerCase();
+        return t.specialties && t.specialties.toLowerCase().includes(goal);
+      });
+    }
+
+    if (currentAnswers.mode) {
+      relevantTrainers = relevantTrainers.filter(t => {
+        const mode = t.service_mode ? t.service_mode.toLowerCase() : '';
+        const targetMode = currentAnswers.mode.toLowerCase();
+        return mode === targetMode || mode === 'hybrid' || mode.includes('vor ort & online');
+      });
+    }
+
+    const prices = relevantTrainers
+      .map(t => (t.package_price ? parseFloat(String(t.package_price)) : NaN))
+      .filter(p => !isNaN(p));
+
+    if (prices.length > 0) {
+      setDynamicPriceRange({
+        min: Math.min(...prices),
+        max: Math.max(...prices),
+      });
+    } else {
+      setDynamicPriceRange({ min: 50, max: 300 }); // Fallback
     }
   };
 
@@ -139,9 +179,9 @@ export default function QuizPage() {
         const priceNum = typeof t.package_price === 'number' ? t.package_price : parseFloat(String(t.package_price));
         if (isNaN(priceNum)) return true;
 
-        if (finalAnswers.budget === '150') return priceNum <= 150;
-        if (finalAnswers.budget === '300') return priceNum > 150 && priceNum <= 300;
-        if (finalAnswers.budget === '300+') return priceNum > 300;
+        if (finalAnswers.budget === 'low') return priceNum <= (dynamicPriceRange.min + (dynamicPriceRange.max - dynamicPriceRange.min) / 3);
+        if (finalAnswers.budget === 'mid') return priceNum > (dynamicPriceRange.min + (dynamicPriceRange.max - dynamicPriceRange.min) / 3) && priceNum <= (dynamicPriceRange.min + ((dynamicPriceRange.max - dynamicPriceRange.min) / 3) * 2);
+        if (finalAnswers.budget === 'high') return priceNum > (dynamicPriceRange.min + ((dynamicPriceRange.max - dynamicPriceRange.min) / 3) * 2);
         return true;
       });
     }
@@ -213,17 +253,17 @@ export default function QuizPage() {
           <div className="space-y-8">
             <div className="text-center space-y-3">
               <span className="bg-emerald-500/10 text-emerald-400 border border-emerald-500/20 px-3 py-1 rounded-full text-xs font-semibold uppercase tracking-wider">
-                Geprüfte Qualität & Exzellenz
+                Geprüfte Qualität & Radikale Transparenz
               </span>
               <h1 className="text-3xl md:text-4xl font-black tracking-tight">
                 {step === 1 && "Wie stufst du dein aktuelles Fitness-Level ein?"}
                 {step === 2 && "Was ist dein primäres Trainingsziel?"}
                 {step === 3 && "Wie möchtest du trainieren?"}
-                {step === 4 && "Welches monatliche Budget planst du ein?"}
+                {step === 4 && "Welches Budget passt zu deiner Planung?"}
               </h1>
-              {step === 2 && (
+              {step === 4 && (
                 <p className="text-slate-400 text-xs">
-                  Ausgegraute Optionen sind aktuell von keinem verifizierten Trainer abgedeckt und daher deaktiviert.
+                  Basierend auf deinen vorherigen Angaben liegt die echte, verfügbare Marktspanne unserer Coaches bei ca. {dynamicPriceRange.min} € – {dynamicPriceRange.max} €.
                 </p>
               )}
             </div>
@@ -309,9 +349,9 @@ export default function QuizPage() {
             {step === 4 && (
               <div className="grid grid-cols-1 gap-3 max-w-xl mx-auto w-full pt-4">
                 {[
-                  { label: 'Bis zu 150 € / Monat', val: '150' },
-                  { label: '150 € – 300 € / Monat', val: '300' },
-                  { label: '300 €+ / Monat (Intensive Betreuung)', val: '300+' },
+                  { label: `Einstieg / Flexibel (bis ca. ${Math.round(dynamicPriceRange.min + (dynamicPriceRange.max - dynamicPriceRange.min) / 3)} €)`, val: 'low' },
+                  { label: `Fortgeschritten / Standard (ca. ${Math.round(dynamicPriceRange.min + (dynamicPriceRange.max - dynamicPriceRange.min) / 3)} € – ${Math.round(dynamicPriceRange.min + ((dynamicPriceRange.max - dynamicPriceRange.min) / 3) * 2)} €)`, val: 'mid' },
+                  { label: `Intensiv / Premium Betreuung (ab ${Math.round(dynamicPriceRange.min + ((dynamicPriceRange.max - dynamicPriceRange.min) / 3) * 2)} €+)`, val: 'high' },
                 ].map((opt) => (
                   <button
                     key={opt.val}
@@ -341,7 +381,7 @@ export default function QuizPage() {
             <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-4 pb-6 border-b border-slate-800">
               <div>
                 <span className="text-xs text-emerald-400 font-semibold uppercase tracking-wider">
-                  Deine Ergebnisse
+                  Deine Ergebnisse (Transparent & Direkt)
                 </span>
                 <h2 className="text-2xl font-extrabold mt-1">Passende Trainer-Matches</h2>
               </div>
@@ -382,6 +422,11 @@ export default function QuizPage() {
                       <p className="text-emerald-400 text-xs font-semibold">
                         {trainer.specialties || 'Individuelles Coaching'}
                       </p>
+                      {trainer.package_price && (
+                        <p className="text-xs text-slate-300 bg-slate-950 p-2.5 rounded-xl border border-slate-800">
+                          Transparenter Preis: <strong className="text-emerald-400">{trainer.package_price} €</strong> {trainer.package_duration ? `(${trainer.package_duration})` : ''}
+                        </p>
+                      )}
                     </div>
 
                     <div className="flex items-center gap-3 pt-2">
@@ -423,17 +468,7 @@ export default function QuizPage() {
               {trainerSlots.length === 0 ? (
                 <p className="text-xs text-slate-500">Derzeit keine freien Slots verfügbar.</p>
               ) : (
-                trainerSlots.map((slot) => (
-                  <div key={slot.id} className="flex justify-between items-center bg-slate-950 p-3 rounded-xl border border-slate-800 text-xs">
-                    <div>
-                      <div className="font-bold">{slot.title}</div>
-                      <div className="text-slate-400">{slot.slot_date} um {slot.slot_time.slice(0, 5)} Uhr • {slot.price}€</div>
-                    </div>
-                    <button onClick={() => handleBookSlot(slot)} className="bg-emerald-500 hover:bg-emerald-600 text-slate-950 px-3 py-1.5 rounded-lg font-bold text-xs cursor-pointer">
-                      Bezahlen & Buchen
-                    </button>
-                  </div>
-                ))
+                renderSlotsList(trainerSlots, handleBookSlot)
               )}
             </div>
           </div>
@@ -445,4 +480,18 @@ export default function QuizPage() {
       </footer>
     </main>
   );
+}
+
+function renderSlotsList(trainerSlots: any[], handleBookSlot: (slot: any) => void) {
+  return trainerSlots.map((slot) => (
+    <div key={slot.id} className="flex justify-between items-center bg-slate-950 p-3 rounded-xl border border-slate-800 text-xs">
+      <div>
+        <div className="font-bold">{slot.title}</div>
+        <div className="text-slate-400">{slot.slot_date} um {slot.slot_time.slice(0, 5)} Uhr • {slot.price}€</div>
+      </div>
+      <button onClick={() => handleBookSlot(slot)} className="bg-emerald-500 hover:bg-emerald-600 text-slate-950 px-3 py-1.5 rounded-lg font-bold text-xs cursor-pointer">
+        Bezahlen & Buchen
+      </button>
+    </div>
+  ));
 }
