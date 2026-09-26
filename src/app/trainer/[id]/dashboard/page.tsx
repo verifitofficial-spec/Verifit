@@ -191,6 +191,13 @@ export default function TrainerDashboard() {
   const [packagePrice, setPackagePrice] = useState('');
   const [availabilityStatus, setAvailabilityStatus] = useState('available');
 
+  // PDF Dokumentspfade & Upload States
+  const [licenseDocPath, setLicenseDocPath] = useState('');
+  const [insuranceDocPath, setInsuranceDocPath] = useState('');
+  const [uploadingLicense, setUploadingLicense] = useState(false);
+  const [uploadingInsurance, setUploadingInsurance] = useState(false);
+  const [docMessage, setDocMessage] = useState('');
+
   const todayObj = new Date();
   const [currentYear, setCurrentYear] = useState(todayObj.getFullYear());
   const [currentMonth, setCurrentMonth] = useState(todayObj.getMonth());
@@ -250,7 +257,7 @@ export default function TrainerDashboard() {
   const [newFoodCarbs, setNewFoodCarbs] = useState('');
   const [newFoodFat, setNewFoodFat] = useState('');
 
-  // Ernährungsplan Builder & Template States (Analog zum Kraftplan)
+  // Ernährungsplan Builder & Template States
   const [nutritionClientId, setNutritionClientId] = useState('');
   const [nutritionMainTitle, setNutritionMainTitle] = useState('');
   const [nutritionDurationWeeks, setNutritionDurationWeeks] = useState('4 Wochen (1 Monat)');
@@ -340,6 +347,10 @@ export default function TrainerDashboard() {
         setPackagePrice(data.package_price ? String(data.package_price) : '');
         setAvailabilityStatus(data.availability_status || 'available');
 
+        // Dokumentpfade für Lizenz & Versicherung laden
+        setLicenseDocPath(data.license_document_path || '');
+        setInsuranceDocPath(data.insurance_document_path || '');
+
         loadSlots(data.id);
         loadBookingRequests(data.id);
         loadClients();
@@ -350,6 +361,80 @@ export default function TrainerDashboard() {
 
     loadTrainerData();
   }, [router]);
+
+  async function handleUploadDocument(file: File, type: 'license' | 'insurance') {
+    if (!trainer) return;
+    if (file.type !== 'application/pdf') {
+      setDocMessage('Fehler: Bitte nur PDF-Dateien hochladen.');
+      return;
+    }
+    if (file.size > 10 * 1024 * 1024) {
+      setDocMessage('Fehler: Die Datei darf maximal 10 MB groß sein.');
+      return;
+    }
+    const setUploading = type === 'license' ? setUploadingLicense : setUploadingInsurance;
+    setUploading(true);
+    setDocMessage('');
+    const filePath = `${trainer.id}/${type}-${Date.now()}.pdf`;
+
+    // Falls schon ein altes Dokument existiert, vorher löschen (verhindert verwaiste Dateien)
+    const oldPath = type === 'license' ? licenseDocPath : insuranceDocPath;
+    if (oldPath) {
+      await supabase.storage.from('verification-docs').remove([oldPath]);
+    }
+
+    const { error: uploadError } = await supabase.storage
+      .from('verification-docs')
+      .upload(filePath, file, { contentType: 'application/pdf', upsert: false });
+
+    if (uploadError) {
+      setDocMessage('Fehler beim Hochladen: ' + uploadError.message);
+      setUploading(false);
+      return;
+    }
+
+    const dbField = type === 'license' ? 'license_document_path' : 'insurance_document_path';
+    const { error: dbError } = await supabase
+      .from('trainers')
+      .update({ [dbField]: filePath })
+      .eq('id', trainer.id);
+
+    if (dbError) {
+      setDocMessage('Fehler beim Speichern des Dokumentpfads: ' + dbError.message);
+    } else {
+      if (type === 'license') setLicenseDocPath(filePath);
+      else setInsuranceDocPath(filePath);
+      setDocMessage(type === 'license' ? 'Lizenz-PDF erfolgreich hochgeladen!' : 'Versicherungsnachweis erfolgreich hochgeladen!');
+    }
+    setUploading(false);
+  }
+
+  async function handleDeleteDocument(type: 'license' | 'insurance') {
+    if (!trainer) return;
+    const path = type === 'license' ? licenseDocPath : insuranceDocPath;
+    if (!path) return;
+    const { error: removeError } = await supabase.storage.from('verification-docs').remove([path]);
+    if (removeError) {
+      setDocMessage('Fehler beim Löschen: ' + removeError.message);
+      return;
+    }
+    const dbField = type === 'license' ? 'license_document_path' : 'insurance_document_path';
+    await supabase.from('trainers').update({ [dbField]: null }).eq('id', trainer.id);
+    if (type === 'license') setLicenseDocPath('');
+    else setInsuranceDocPath('');
+    setDocMessage('Dokument entfernt.');
+  }
+
+  async function handleViewDocument(path: string) {
+    const { data, error } = await supabase.storage
+      .from('verification-docs')
+      .createSignedUrl(path, 60); // Link ist 60 Sekunden gültig
+    if (error || !data) {
+      alert('Dokument konnte nicht geöffnet werden: ' + error?.message);
+      return;
+    }
+    window.open(data.signedUrl, '_blank');
+  }
 
   async function loadSlots(trainerId: string) {
     const { data } = await supabase
@@ -1217,6 +1302,106 @@ export default function TrainerDashboard() {
                 onChange={(e) => setInsuranceExpiry(e.target.value)}
                 className="w-full bg-slate-950/80 border border-slate-800 rounded-xl px-4 py-3 text-sm text-white focus:outline-none focus:border-emerald-500 transition shadow-inner"
               />
+            </div>
+          </div>
+
+          {/* PDF Upload Feedback Message */}
+          {docMessage && (
+            <div className={`p-3.5 rounded-xl text-xs font-medium border ${docMessage.includes('Fehler') ? 'bg-red-500/10 border-red-500/25 text-red-400' : 'bg-emerald-500/10 border-emerald-500/25 text-emerald-400'}`}>
+              {docMessage}
+            </div>
+          )}
+
+          {/* PDF Upload Buttons & Preview Cards */}
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-4 pt-2">
+            {/* Lizenz-Upload */}
+            <div className="bg-slate-950/80 border border-slate-800 rounded-xl p-5 space-y-3">
+              <label className="block text-xs font-semibold text-slate-400 uppercase tracking-wider">
+                Trainerlizenz / Zertifikat (PDF)
+              </label>
+              {licenseDocPath ? (
+                <div className="flex items-center justify-between bg-slate-900 border border-emerald-500/30 rounded-xl p-3">
+                  <button
+                    type="button"
+                    onClick={() => handleViewDocument(licenseDocPath)}
+                    className="text-xs text-emerald-400 hover:underline flex items-center gap-2 cursor-pointer"
+                  >
+                    📄 Dokument ansehen
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => handleDeleteDocument('license')}
+                    className="text-xs text-red-400 hover:text-red-300 cursor-pointer"
+                  >
+                    Entfernen
+                  </button>
+                </div>
+              ) : (
+                <p className="text-xs text-slate-500">Noch kein Dokument hochgeladen.</p>
+              )}
+              <label className={`block w-full text-center text-xs font-semibold py-2.5 rounded-xl border cursor-pointer transition ${
+                uploadingLicense
+                  ? 'bg-slate-800 border-slate-700 text-slate-500 cursor-not-allowed'
+                  : 'bg-slate-900 border-slate-700 text-emerald-400 hover:border-emerald-500/50'
+              }`}>
+                {uploadingLicense ? 'Lade hoch...' : licenseDocPath ? 'Ersetzen' : 'PDF hochladen'}
+                <input
+                  type="file"
+                  accept="application/pdf"
+                  disabled={uploadingLicense}
+                  onChange={(e) => {
+                    const file = e.target.files?.[0];
+                    if (file) handleUploadDocument(file, 'license');
+                    e.target.value = '';
+                  }}
+                  className="hidden"
+                />
+              </label>
+            </div>
+
+            {/* Versicherungsnachweis-Upload */}
+            <div className="bg-slate-950/80 border border-slate-800 rounded-xl p-5 space-y-3">
+              <label className="block text-xs font-semibold text-slate-400 uppercase tracking-wider">
+                Berufshaftpflicht-Nachweis (PDF)
+              </label>
+              {insuranceDocPath ? (
+                <div className="flex items-center justify-between bg-slate-900 border border-emerald-500/30 rounded-xl p-3">
+                  <button
+                    type="button"
+                    onClick={() => handleViewDocument(insuranceDocPath)}
+                    className="text-xs text-emerald-400 hover:underline flex items-center gap-2 cursor-pointer"
+                  >
+                    📄 Dokument ansehen
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => handleDeleteDocument('insurance')}
+                    className="text-xs text-red-400 hover:text-red-300 cursor-pointer"
+                  >
+                    Entfernen
+                  </button>
+                </div>
+              ) : (
+                <p className="text-xs text-slate-500">Noch kein Dokument hochgeladen.</p>
+              )}
+              <label className={`block w-full text-center text-xs font-semibold py-2.5 rounded-xl border cursor-pointer transition ${
+                uploadingInsurance
+                  ? 'bg-slate-800 border-slate-700 text-slate-500 cursor-not-allowed'
+                  : 'bg-slate-900 border-slate-700 text-emerald-400 hover:border-emerald-500/50'
+              }`}>
+                {uploadingInsurance ? 'Lade hoch...' : insuranceDocPath ? 'Ersetzen' : 'PDF hochladen'}
+                <input
+                  type="file"
+                  accept="application/pdf"
+                  disabled={uploadingInsurance}
+                  onChange={(e) => {
+                    const file = e.target.files?.[0];
+                    if (file) handleUploadDocument(file, 'insurance');
+                    e.target.value = '';
+                  }}
+                  className="hidden"
+                />
+              </label>
             </div>
           </div>
         </div>
@@ -2206,7 +2391,6 @@ export default function TrainerDashboard() {
                                       className="w-full bg-slate-900 border border-slate-800 rounded-lg px-3 py-2 text-xs text-emerald-400 font-bold focus:outline-none focus:border-emerald-500"
                                     />
 
-                                    {/* REPARIERTE SUCHLEISTE: Bedingung !item.foodId entfernt, damit das Dropdown bei Eingabe immer erscheint */}
                                     {item.foodSearchInput && filteredFoods.length > 0 && (
                                       <div className="absolute left-0 right-0 top-full mt-1 bg-slate-950 border border-emerald-500/50 rounded-xl shadow-2xl z-[9999] max-h-56 overflow-y-auto">
                                         {filteredFoods.map((f: any) => (
