@@ -5,6 +5,18 @@ import Link from 'next/link';
 import { useRouter } from 'next/navigation';
 import { supabase } from '@/app/lib/supabase';
 
+// Exportierte Liste der Spezialisierungen / Quiz-Kategorien
+export const AVAILABLE_SPECIALTIES = [
+  'Gewichtsverlust',
+  'Muskelaufbau',
+  'Body-Transformation',
+  'Mobilität',
+  'Functional Fitness',
+  'Krafttraining',
+  'Ernährungsberatung',
+  'Rehabilitation'
+];
+
 type Trainer = {
   id: string;
   name: string;
@@ -32,11 +44,11 @@ const MASTER_GOAL_BLOCKS = [
   },
   {
     category: "Gewichtsverlust & Transformation",
-    items: ["Abnehmen", "Fettabbau", "Body-Transformation", "Ernährungsberatung"]
+    items: ["Gewichtsverlust", "Abnehmen", "Fettabbau", "Body-Transformation", "Ernährungsberatung"]
   },
   {
     category: "Gesundheit & Prävention",
-    items: ["Rückentraining", "Reha", "Haltung", "Schmerzprävention", "Mobilität"]
+    items: ["Rückentraining", "Reha", "Rehabilitation", "Haltung", "Schmerzprävention", "Mobilität"]
   },
   {
     category: "Performance & Athletik",
@@ -101,7 +113,15 @@ export default function QuizPage() {
 
   const isGoalAvailable = (item: string) => {
     const query = item.toLowerCase();
-    return activeTrainerKeywords.some(kw => kw.includes(query) || query.includes(kw));
+    const synonyms = [query];
+    if (query === 'gewichtsverlust') synonyms.push('abnehmen', 'fettabbau');
+    if (query === 'abnehmen') synonyms.push('gewichtsverlust');
+    if (query === 'rehabilitation') synonyms.push('reha');
+    if (query === 'reha') synonyms.push('rehabilitation');
+
+    return activeTrainerKeywords.some(kw => 
+      synonyms.some(s => kw.includes(s) || s.includes(kw))
+    );
   };
 
   const handleSelectOption = (key: keyof QuizAnswers, value: string) => {
@@ -109,7 +129,6 @@ export default function QuizPage() {
     setAnswers(updatedAnswers);
 
     if (step < 4) {
-      // Wenn wir von Schritt 3 zu Schritt 4 gehen, berechnen wir die passenden Preisspannen vorab
       if (step === 3) {
         calculateDynamicBudgetRange(updatedAnswers);
       }
@@ -119,14 +138,17 @@ export default function QuizPage() {
     }
   };
 
-  // Berechnet die echten min/max Preise basierend auf den bisherigen Auswahl-Filtern (Ziel & Modus)
   const calculateDynamicBudgetRange = (currentAnswers: QuizAnswers) => {
     let relevantTrainers = [...trainers];
 
     if (currentAnswers.goal) {
       relevantTrainers = relevantTrainers.filter(t => {
+        if (!t.specialties) return false;
+        const spec = t.specialties.toLowerCase();
         const goal = currentAnswers.goal.toLowerCase();
-        return t.specialties && t.specialties.toLowerCase().includes(goal);
+        return spec.includes(goal) || 
+               (goal === 'gewichtsverlust' && spec.includes('abnehmen')) ||
+               (goal === 'rehabilitation' && spec.includes('reha'));
       });
     }
 
@@ -160,8 +182,17 @@ export default function QuizPage() {
 
     if (finalAnswers.goal) {
       results = results.filter(t => {
+        if (!t.specialties) return false;
+        const spec = t.specialties.toLowerCase();
         const goal = finalAnswers.goal.toLowerCase();
-        return t.specialties && t.specialties.toLowerCase().includes(goal);
+
+        let matches = spec.includes(goal);
+        if (goal === 'gewichtsverlust') matches = matches || spec.includes('abnehmen') || spec.includes('fettabbau');
+        if (goal === 'abnehmen') matches = matches || spec.includes('gewichtsverlust');
+        if (goal === 'rehabilitation') matches = matches || spec.includes('reha');
+        if (goal === 'reha') matches = matches || spec.includes('rehabilitation');
+
+        return matches;
       });
     }
 

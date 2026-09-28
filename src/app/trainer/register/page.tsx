@@ -61,7 +61,7 @@ export default function TrainerRegisterPage() {
           name: result.data.name,
           email: result.data.email,
           bio,
-          status: 'pending',
+          status: 'pending', // Erzwingt manuelles/Admin-Approval
         },
       ]);
 
@@ -70,9 +70,10 @@ export default function TrainerRegisterPage() {
         setLoading(false);
         return;
       }
-    }
 
-    router.push('/trainers/list');
+      // Korrekte Weiterleitung nach erfolgreicher Registrierung zum Dashboard
+      router.push(`/trainer/${user.id}/dashboard`);
+    }
   }
 
   return (

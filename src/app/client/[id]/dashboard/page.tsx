@@ -18,22 +18,30 @@ type TrackingEntry = {
 
 type NutritionPlan = {
   id: string;
-  day_of_week: string;
-  meal_title: string;
-  description: string | null;
-  calories: number | null;
-  protein: number | null;
-  carbs: number | null;
-  fat: number | null;
+  day_of_week?: string;
+  meal_title?: string;
+  title?: string;
+  description?: string | null;
+  calories?: number | null;
+  protein?: number | null;
+  carbs?: number | null;
+  fat?: number | null;
+  type?: string;
+  plan_type?: string;
+  [key: string]: any;
 };
 
 type WorkoutPlan = {
   id: string;
-  day_of_week: string;
-  exercise_name: string;
-  sets: number | null;
-  reps: string | null;
-  weight: number | null;
+  day_of_week?: string;
+  exercise_name?: string;
+  title?: string;
+  sets?: number | null;
+  reps?: string | number | null;
+  weight?: number | null;
+  type?: string;
+  plan_type?: string;
+  [key: string]: any;
 };
 
 const DAYS_OF_WEEK = ['Montag', 'Dienstag', 'Mittwoch', 'Donnerstag', 'Freitag', 'Samstag', 'Sonntag'];
@@ -101,7 +109,7 @@ export default function ClientDashboard({ params }: { params: Promise<{ id: stri
 
       loadClientSlots(clientData.email);
       loadTrackingHistory(clientData.id);
-      loadPlans(clientData.id);
+      loadPlans(clientData.email, clientData.id);
       setLoading(false);
     }
 
@@ -139,23 +147,28 @@ export default function ClientDashboard({ params }: { params: Promise<{ id: stri
     }
   }
 
-  async function loadPlans(cId: string) {
-    const { data: nutData } = await supabase
-      .from('nutrition_plans')
+  async function loadPlans(clientEmail: string, clientId?: string) {
+    const { data, error } = await supabase
+      .from('client_plans')
       .select('*')
-      .eq('client_id', cId);
+      .or(`client_email.eq.${clientEmail},client_id.eq.${clientId}`)
+      .order('created_at', { ascending: false });
 
-    if (nutData) {
-      setNutritionPlans(nutData);
+    if (error) {
+      console.error('Fehler beim Laden der Pläne:', error.message);
+      return;
     }
 
-    const { data: workData } = await supabase
-      .from('workout_plans')
-      .select('*')
-      .eq('client_id', cId);
+    if (data) {
+      const workout = data.filter(
+        (p) => p.type === 'workout' || p.plan_type === 'workout'
+      );
+      const nutrition = data.filter(
+        (p) => p.type === 'nutrition' || p.plan_type === 'nutrition'
+      );
 
-    if (workData) {
-      setWorkoutPlans(workData);
+      setWorkoutPlans(workout);
+      setNutritionPlans(nutrition);
     }
   }
 
@@ -500,7 +513,7 @@ export default function ClientDashboard({ params }: { params: Promise<{ id: stri
                   {currentDayNutrition.map((meal) => (
                     <div key={meal.id} className="bg-slate-900 p-4 rounded-xl border border-slate-800 space-y-2">
                       <div className="flex justify-between items-center">
-                        <span className="font-bold text-xs text-white">{meal.meal_title}</span>
+                        <span className="font-bold text-xs text-white">{meal.meal_title || meal.title || 'Mahlzeit'}</span>
                         {meal.calories && (
                           <span className="text-[10px] bg-emerald-500/10 text-emerald-400 px-2 py-0.5 rounded-full font-bold">
                             {meal.calories} kcal
@@ -509,9 +522,9 @@ export default function ClientDashboard({ params }: { params: Promise<{ id: stri
                       </div>
                       {meal.description && <p className="text-xs text-slate-300">{meal.description}</p>}
                       <div className="flex gap-3 text-[11px] text-slate-400 pt-1 border-t border-slate-800/60">
-                        {meal.protein !== null && <span>Protein: <strong className="text-slate-200">{meal.protein}g</strong></span>}
-                        {meal.carbs !== null && <span>Kohlenhydrate: <strong className="text-slate-200">{meal.carbs}g</strong></span>}
-                        {meal.fat !== null && <span>Fett: <strong className="text-slate-200">{meal.fat}g</strong></span>}
+                        {meal.protein !== null && meal.protein !== undefined && <span>Protein: <strong className="text-slate-200">{meal.protein}g</strong></span>}
+                        {meal.carbs !== null && meal.carbs !== undefined && <span>Kohlenhydrate: <strong className="text-slate-200">{meal.carbs}g</strong></span>}
+                        {meal.fat !== null && meal.fat !== undefined && <span>Fett: <strong className="text-slate-200">{meal.fat}g</strong></span>}
                       </div>
                     </div>
                   ))}
@@ -531,12 +544,12 @@ export default function ClientDashboard({ params }: { params: Promise<{ id: stri
                   {currentDayWorkout.map((ex) => (
                     <div key={ex.id} className="bg-slate-900 p-4 rounded-xl border border-slate-800 flex justify-between items-center">
                       <div>
-                        <span className="font-bold text-xs text-white block mb-1">{ex.exercise_name}</span>
+                        <span className="font-bold text-xs text-white block mb-1">{ex.exercise_name || ex.title || 'Übung'}</span>
                         <p className="text-[11px] text-slate-400">
                           Sätze: <strong className="text-slate-200">{ex.sets}</strong> &bull; Wiederholungen: <strong className="text-slate-200">{ex.reps}</strong>
                         </p>
                       </div>
-                      {ex.weight !== null && (
+                      {ex.weight !== null && ex.weight !== undefined && (
                         <span className="text-xs bg-blue-500/10 text-blue-400 px-2.5 py-1 rounded-xl font-bold border border-blue-500/20">
                           {ex.weight} kg
                         </span>
