@@ -72,7 +72,7 @@ export default function TrainerRegisterPage() {
       }
     }
 
-    router.push('/trainers');
+    router.push('/trainers/list');
   }
 
   return (

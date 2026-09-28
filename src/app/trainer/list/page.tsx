@@ -12,16 +12,26 @@ export default function PublicTrainersPage() {
   const [selectedTrainer, setSelectedTrainer] = useState<any>(null);
   const [trainerSlots, setTrainerSlots] = useState<any[]>([]);
   const [bookingMessage, setBookingMessage] = useState('');
+  const [clientEmail, setClientEmail] = useState('');
 
   useEffect(() => {
     fetchApprovedTrainers();
+    loadCurrentUser();
   }, []);
+
+  async function loadCurrentUser() {
+    const { data: { user } } = await supabase.auth.getUser();
+    if (user?.email) {
+      setClientEmail(user.email);
+    }
+  }
 
   async function fetchApprovedTrainers() {
     setLoading(true);
+    // Datenleck behoben: Nur öffentliche Profilspalten abfragen
     const { data, error } = await supabase
       .from('trainers')
-      .select('*')
+      .select('id, name, bio, city, service_mode, specialties, package_category, package_duration, package_price, availability_status')
       .eq('status', 'approved');
 
     if (error) {
@@ -45,17 +55,49 @@ export default function PublicTrainersPage() {
     setTrainerSlots(data || []);
   }
 
-  async function handleBookSlot(slotId: string) {
-    const { error } = await supabase
-      .from('trainer_slots')
-      .update({ status: 'pending' })
-      .eq('id', slotId);
+  async function handleBookSlot(slot: any) {
+    if (!clientEmail.trim()) {
+      setBookingMessage('Bitte gib deine E-Mail-Adresse für die Buchung an.');
+      return;
+    }
 
-    if (error) {
-      setBookingMessage('Fehler bei der Buchungsanfrage: ' + error.message);
+    // Bei kostenpflichtigen Slots (> 0 €) Aufruf an Stripe Checkout
+    if (slot.price && slot.price > 0) {
+      try {
+        const res = await fetch('/api/checkout', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ slotId: slot.id }),
+        });
+        const data = await res.json();
+        if (data.url) {
+          window.location.href = data.url;
+          return;
+        } else {
+          setBookingMessage(data.error || 'Fehler beim Starten des Checkouts');
+          return;
+        }
+      } catch (e) {
+        setBookingMessage('Netzwerkfehler beim Aufruf des Checkouts.');
+        return;
+      }
+    }
+
+    // Bei 0-€ / Anfrageslots: Direkt anfragen mit E-Mail & Status-Check
+    const { data, error } = await supabase
+      .from('trainer_slots')
+      .update({ 
+        status: 'pending',
+        client_email: clientEmail 
+      })
+      .eq('id', slot.id)
+      .eq('status', 'free') // Verhindert Doppelbuchung
+      .select('id');
+
+    if (error || !data || data.length === 0) {
+      setBookingMessage('Termin konnte nicht angefragt werden. Eventuell ist er bereits vergeben.');
     } else {
       setBookingMessage('Termin erfolgreich angefragt! Der Trainer wird benachrichtigt.');
-      // Slots neu laden
       openBookingModal(selectedTrainer);
     }
   }
@@ -164,6 +206,17 @@ export default function PublicTrainersPage() {
               </button>
             </div>
 
+            <div className="space-y-1">
+              <label className="block text-[10px] font-semibold text-slate-400 uppercase tracking-wider">Deine E-Mail-Adresse für Bestätigungen</label>
+              <input
+                type="email"
+                placeholder="deine.email@beispiel.de"
+                value={clientEmail}
+                onChange={(e) => setClientEmail(e.target.value)}
+                className="w-full bg-slate-950 border border-slate-800 rounded-xl px-3 py-2 text-xs text-white focus:outline-none focus:border-emerald-500"
+              />
+            </div>
+
             {bookingMessage && (
               <div className="p-3 bg-emerald-500/10 border border-emerald-500/30 text-emerald-400 text-xs rounded-xl">
                 {bookingMessage}
@@ -179,13 +232,15 @@ export default function PublicTrainersPage() {
                   <div key={slot.id} className="flex justify-between items-center bg-slate-950 p-3 rounded-xl border border-slate-800 text-xs">
                     <div>
                       <div className="font-bold">{slot.title}</div>
-                      <div className="text-slate-400">{slot.slot_date} um {slot.slot_time.slice(0, 5)} Uhr • {slot.price}€</div>
+                      <div className="text-slate-400">
+                        {slot.slot_date} um {slot.slot_time ? slot.slot_time.slice(0, 5) : '--:--'} Uhr • {slot.price ? `${slot.price}€` : 'Kostenlos'}
+                      </div>
                     </div>
                     <button
-                      onClick={() => handleBookSlot(slot.id)}
+                      onClick={() => handleBookSlot(slot)}
                       className="bg-emerald-500 hover:bg-emerald-600 text-slate-950 px-3 py-1.5 rounded-lg font-bold text-xs cursor-pointer"
                     >
-                      Anfragen
+                      {slot.price && slot.price > 0 ? 'Buchen (Stripe)' : 'Anfragen'}
                     </button>
                   </div>
                 ))

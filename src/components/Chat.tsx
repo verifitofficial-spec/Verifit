@@ -1,78 +1,83 @@
 'use client';
 
-import { useState, useEffect } from 'react';
+import { useEffect, useState } from 'react';
 import { supabase } from '@/app/lib/supabase';
+import { Send, User as UserIcon } from 'lucide-react';
 
-type Contact = {
-  id: string;
-  name: string;
-  email: string;
-};
+interface ChatProps {
+  currentUserId: string;
+}
 
-type Message = {
-  id: string;
-  sender_id: string;
-  receiver_id: string;
-  content: string;
-  created_at: string;
-};
-
-export default function Chat({ currentUserId }: { currentUserId: string }) {
-  const [contacts, setContacts] = useState<Contact[]>([]);
-  const [selectedContact, setSelectedContact] = useState<Contact | null>(null);
-  const [messages, setMessages] = useState<Message[]>([]);
+export default function Chat({ currentUserId }: ChatProps) {
+  const [contacts, setContacts] = useState<any[]>([]);
+  const [activeContact, setActiveContact] = useState<any>(null);
+  const [messages, setMessages] = useState<any[]>([]);
   const [newMessage, setNewMessage] = useState('');
+  const [loadingContacts, setLoadingContacts] = useState(true);
 
-  // 1. Kontakte laden (Beispiel: Alle anderen User aus der Auth/Trainer-Tabelle)
   useEffect(() => {
-    async function fetchContacts() {
-      // Hier laden wir je nach Rolle die passenden Gesprächspartner
-      const { data, error } = await supabase.from('trainers').select('id, name, email');
-      if (data && !error) {
-        // Filtere den eigenen Account heraus
-        const filtered = data.filter((c) => c.id !== currentUserId);
-        setContacts(filtered);
-        if (filtered.length > 0) setSelectedContact(filtered[0]);
+    async function loadContacts() {
+      setLoadingContacts(true);
+
+      // 1. Prüfen, ob der aktuelle Nutzer ein Trainer ist
+      const { data: trainerCheck } = await supabase
+        .from('trainers')
+        .select('id')
+        .eq('id', currentUserId)
+        .single();
+
+      if (trainerCheck) {
+        // Nutzer ist Trainer -> Lade Kunden
+        const { data: clientsData } = await supabase
+          .from('clients')
+          .select('id, name, email');
+        if (clientsData) setContacts(clientsData);
+      } else {
+        // Nutzer ist Kunde -> Lade Trainer
+        const { data: trainersData } = await supabase
+          .from('trainers')
+          .select('id, name, email');
+        if (trainersData) setContacts(trainersData);
       }
+
+      setLoadingContacts(false);
     }
-    fetchContacts();
+
+    if (currentUserId) {
+      loadContacts();
+    }
   }, [currentUserId]);
 
-  // 2. Nachrichten für den ausgewählten Chat laden & Realtime aktivieren
   useEffect(() => {
-    if (!selectedContact) return;
+    if (!activeContact || !currentUserId) return;
 
-    async function fetchMessages() {
-      const { data, error } = await supabase
+    async function loadMessages() {
+      const { data } = await supabase
         .from('messages')
         .select('*')
         .or(
-          `and(sender_id.eq.${currentUserId},receiver_id.eq.${selectedContact?.id}),and(sender_id.eq.${selectedContact?.id},receiver_id.eq.${currentUserId})`
+          `and(sender_id.eq.${currentUserId},receiver_id.eq.${activeContact.id}),and(sender_id.eq.${activeContact.id},receiver_id.eq.${currentUserId})`
         )
         .order('created_at', { ascending: true });
 
-      if (data && !error) {
-        setMessages(data);
-      }
+      if (data) setMessages(data);
     }
 
-    fetchMessages();
+    loadMessages();
 
     // Supabase Realtime Subscription für neue Nachrichten
     const channel = supabase
-      .channel('public:messages')
+      .channel('chat_messages')
       .on(
         'postgres_changes',
-        {
-          event: 'INSERT',
-          schema: 'public',
-          table: 'messages',
-          filter: `receiver_id=eq.${currentUserId}`,
-        },
+        { event: 'INSERT', schema: 'public', table: 'messages' },
         (payload) => {
-          const newMsg = payload.new as Message;
-          if (newMsg.sender_id === selectedContact.id) {
-            setMessages((prev) => [...prev, newMsg]);
+          const msg = payload.new;
+          if (
+            (msg.sender_id === currentUserId && msg.receiver_id === activeContact.id) ||
+            (msg.sender_id === activeContact.id && msg.receiver_id === currentUserId)
+          ) {
+            setMessages((prev) => [...prev, msg]);
           }
         }
       )
@@ -81,99 +86,115 @@ export default function Chat({ currentUserId }: { currentUserId: string }) {
     return () => {
       supabase.removeChannel(channel);
     };
-  }, [selectedContact, currentUserId]);
+  }, [activeContact, currentUserId]);
 
-  // 3. Nachricht senden
   async function handleSendMessage(e: React.FormEvent) {
     e.preventDefault();
-    if (!newMessage.trim() || !selectedContact) return;
+    if (!newMessage.trim() || !activeContact) return;
 
-    const msgPayload = {
+    const payload = {
       sender_id: currentUserId,
-      receiver_id: selectedContact.id,
-      content: newMessage,
+      receiver_id: activeContact.id,
+      content: newMessage.trim(),
+      created_at: new Date().toISOString(),
     };
 
-    const { data, error } = await supabase.from('messages').insert([msgPayload]).select();
+    const { error } = await supabase.from('messages').insert(payload);
 
-    if (data && !error) {
-      setMessages((prev) => [...prev, data[0]]);
+    if (error) {
+      console.error('Fehler beim Senden:', error.message);
+    } else {
       setNewMessage('');
     }
   }
 
   return (
-    <div className="flex h-[600px] bg-slate-900 border border-slate-800 rounded-2xl overflow-hidden shadow-2xl">
-      {/* Kontaktliste Sidebar */}
-      <div className="w-1/3 border-r border-slate-800 flex flex-col">
-        <div className="p-4 border-b border-slate-800 font-bold text-sm text-slate-300">
-          Gesprächspartner
-        </div>
-        <div className="overflow-y-auto flex-1 divide-y divide-slate-800/50">
-          {contacts.map((contact) => (
+    <div className="grid grid-cols-1 md:grid-cols-3 gap-4 bg-slate-950/80 rounded-2xl border border-slate-800 p-4 h-[500px]">
+      {/* Kontakte-Liste */}
+      <div className="border-r border-slate-800/80 pr-4 space-y-3 overflow-y-auto">
+        <h3 className="text-xs font-bold text-slate-400 uppercase tracking-wider mb-2">Kontakte</h3>
+        {loadingContacts ? (
+          <p className="text-xs text-slate-500">Lade Kontakte...</p>
+        ) : contacts.length === 0 ? (
+          <p className="text-xs text-slate-500">Keine Kontakte gefunden.</p>
+        ) : (
+          contacts.map((contact) => (
             <button
               key={contact.id}
-              onClick={() => setSelectedContact(contact)}
-              className={`w-full p-4 text-left transition flex flex-col ${
-                selectedContact?.id === contact.id ? 'bg-slate-800/80' : 'hover:bg-slate-800/40'
+              onClick={() => setActiveContact(contact)}
+              className={`w-full text-left p-3 rounded-xl text-xs transition flex items-center gap-3 border ${
+                activeContact?.id === contact.id
+                  ? 'bg-emerald-500/20 border-emerald-500 text-emerald-300 font-bold'
+                  : 'bg-slate-900 border-slate-800 text-slate-300 hover:border-slate-700'
               }`}
             >
-              <span className="font-semibold text-sm text-white">{contact.name}</span>
-              <span className="text-xs text-slate-400 truncate">{contact.email}</span>
+              <div className="p-2 bg-slate-800 rounded-full text-slate-400">
+                <UserIcon size={14} />
+              </div>
+              <div className="truncate">
+                <p className="font-semibold text-white truncate">{contact.name || 'Unbenannter Nutzer'}</p>
+                <p className="text-[10px] text-slate-500 truncate">{contact.email}</p>
+              </div>
             </button>
-          ))}
-        </div>
+          ))
+        )}
       </div>
 
-      {/* Chatfenster */}
-      <div className="w-2/3 flex flex-col bg-slate-950/50">
-        {selectedContact ? (
+      {/* Chat-Fenster */}
+      <div className="md:col-span-2 flex flex-col justify-between h-full pl-0 md:pl-2">
+        {activeContact ? (
           <>
-            {/* Header */}
-            <div className="p-4 border-b border-slate-800 font-semibold text-sm text-emerald-400 bg-slate-900/50">
-              Chat mit {selectedContact.name}
+            <div className="pb-3 border-b border-slate-800">
+              <h3 className="text-sm font-bold text-white">{activeContact.name || activeContact.email}</h3>
             </div>
 
-            {/* Nachrichtenverlauf */}
-            <div className="flex-1 p-4 overflow-y-auto space-y-3">
-              {messages.map((msg) => {
-                const isMe = msg.sender_id === currentUserId;
-                return (
-                  <div key={msg.id} className={`flex ${isMe ? 'justify-end' : 'justify-start'}`}>
+            {/* Nachrichten-Verlauf */}
+            <div className="flex-1 overflow-y-auto my-3 space-y-2 pr-2">
+              {messages.length === 0 ? (
+                <p className="text-center text-xs text-slate-500 mt-10">Noch keine Nachrichten. Schreibe die erste Nachricht!</p>
+              ) : (
+                messages.map((msg) => {
+                  const isMe = msg.sender_id === currentUserId;
+                  return (
                     <div
-                      className={`max-w-xs md:max-w-md px-4 py-2.5 rounded-2xl text-sm ${
-                        isMe
-                          ? 'bg-emerald-500 text-slate-950 font-medium rounded-br-none'
-                          : 'bg-slate-800 text-white rounded-bl-none border border-slate-700/50'
-                      }`}
+                      key={msg.id || Math.random()}
+                      className={`flex ${isMe ? 'justify-end' : 'justify-start'}`}
                     >
-                      {msg.content}
+                      <div
+                        className={`max-w-[75%] px-3.5 py-2 rounded-xl text-xs ${
+                          isMe
+                            ? 'bg-emerald-500 text-slate-950 font-medium rounded-br-none'
+                            : 'bg-slate-900 text-slate-200 border border-slate-800 rounded-bl-none'
+                        }`}
+                      >
+                        {msg.content}
+                      </div>
                     </div>
-                  </div>
-                );
-              })}
+                  );
+                })
+              )}
             </div>
 
-            {/* Eingabefeld */}
-            <form onSubmit={handleSendMessage} className="p-4 border-t border-slate-800 flex gap-2 bg-slate-900/50">
+            {/* Eingabeformular */}
+            <form onSubmit={handleSendMessage} className="flex gap-2">
               <input
                 type="text"
-                placeholder="Schreibe eine Nachricht..."
+                placeholder="Nachricht schreiben..."
                 value={newMessage}
                 onChange={(e) => setNewMessage(e.target.value)}
-                className="flex-1 bg-slate-950 border border-slate-800 rounded-xl px-4 py-2.5 text-sm text-white focus:outline-none focus:border-emerald-500"
+                className="flex-1 bg-slate-900 border border-slate-800 rounded-xl px-3.5 py-2.5 text-xs text-white focus:outline-none focus:border-emerald-500"
               />
               <button
                 type="submit"
-                className="bg-emerald-500 hover:bg-emerald-600 text-slate-950 px-5 py-2.5 rounded-xl font-bold text-sm transition"
+                className="bg-emerald-500 hover:bg-emerald-600 text-slate-950 px-4 py-2.5 rounded-xl text-xs font-bold transition flex items-center gap-1 cursor-pointer"
               >
-                Senden
+                <Send size={14} />
               </button>
             </form>
           </>
         ) : (
-          <div className="flex-1 flex items-center justify-center text-slate-500 text-sm">
-            Wähle einen Kontakt aus, um zu chatten.
+          <div className="flex flex-col items-center justify-center h-full text-slate-500 text-xs">
+            Wähle einen Kontakt aus, um das Gespräch zu starten.
           </div>
         )}
       </div>
