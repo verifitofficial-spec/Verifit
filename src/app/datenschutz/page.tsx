@@ -4,12 +4,12 @@ export default function DatenschutzPage() {
   return (
     <main className="min-h-screen bg-slate-950 text-white flex flex-col justify-between">
       {/* Header */}
-      <header className="flex justify-between items-center px-6 py-6 max-w-4xl mx-auto w-full border-b border-slate-900">
+      <header className="flex justify-between items-center px-6 py-6 max-w-7xl mx-auto w-full">
         <Link href="/" className="text-2xl font-black tracking-wider text-emerald-400">
           VERIFIT<span className="text-white">.</span>
         </Link>
-        <Link href="/" className="text-xs text-slate-400 hover:text-white transition">
-          Zur Startseite
+        <Link href="/" className="text-sm font-medium text-slate-300 hover:text-white transition">
+          &larr; Zurück zur Startseite
         </Link>
       </header>
 
@@ -62,7 +62,7 @@ export default function DatenschutzPage() {
       </section>
 
       {/* Footer */}
-      <footer className="border-t border-slate-900 py-6 text-center text-xs text-slate-600 max-w-4xl mx-auto w-full">
+      <footer className="border-t border-slate-900 py-6 text-center text-xs text-slate-600 max-w-7xl mx-auto w-full">
         &copy; {new Date().getFullYear()} VeriFit. Alle Rechte vorbehalten.
       </footer>
     </main>

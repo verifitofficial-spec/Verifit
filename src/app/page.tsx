@@ -37,8 +37,18 @@ export default function HomePage() {
         </div>
       </section>
 
-      <footer className="border-t border-slate-900 py-6 text-center text-xs text-slate-600 max-w-7xl mx-auto w-full">
-        &copy; {new Date().getFullYear()} VeriFit. Alle Rechte vorbehalten.
+      <footer className="border-t border-slate-900 py-6 px-6 flex flex-col sm:flex-row items-center justify-between text-xs text-slate-600 max-w-7xl mx-auto w-full gap-4">
+        <div>
+          &copy; {new Date().getFullYear()} VeriFit. Alle Rechte vorbehalten.
+        </div>
+        <div className="flex items-center gap-6">
+          <Link href="/impressum" className="hover:text-slate-400 transition">
+            Impressum
+          </Link>
+          <Link href="/datenschutz" className="hover:text-slate-400 transition">
+            Datenschutz
+          </Link>
+        </div>
       </footer>
     </main>
   );

@@ -4,23 +4,40 @@ import { useState } from 'react';
 import { useRouter } from 'next/navigation';
 import Link from 'next/link';
 import { supabase } from '@/app/lib/supabase';
+import { registerSchema } from '@/app/lib/validation/authSchemas';
+import { FormFieldError } from '@/components/FormError';
 
 export default function ClientRegisterPage() {
   const [name, setName] = useState('');
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
+  const [confirmPassword, setConfirmPassword] = useState('');
   const [loading, setLoading] = useState(false);
   const [errorMessage, setErrorMessage] = useState('');
+  const [fieldErrors, setFieldErrors] = useState<{ name?: string; email?: string; password?: string; confirmPassword?: string }>({});
   const router = useRouter();
 
   async function handleRegister(e: React.FormEvent) {
     e.preventDefault();
-    setLoading(true);
     setErrorMessage('');
+    setFieldErrors({});
+
+    const result = registerSchema.safeParse({ name, email, password, confirmPassword });
+    if (!result.success) {
+      const errors: { name?: string; email?: string; password?: string; confirmPassword?: string } = {};
+      for (const issue of result.error.issues) {
+        const key = issue.path[0] as 'name' | 'email' | 'password' | 'confirmPassword';
+        if (!errors[key]) errors[key] = issue.message;
+      }
+      setFieldErrors(errors);
+      return;
+    }
+
+    setLoading(true);
 
     const { data: authData, error: authError } = await supabase.auth.signUp({
-      email,
-      password,
+      email: result.data.email,
+      password: result.data.password,
       options: {
         data: {
           role: 'client', // Übergibt die Rolle an den Datenbank-Trigger für die profiles-Tabelle
@@ -40,8 +57,8 @@ export default function ClientRegisterPage() {
       const { error: clientError } = await supabase.from('clients').insert([
         {
           id: user.id,
-          name,
-          email,
+          name: result.data.name,
+          email: result.data.email,
         },
       ]);
 
@@ -81,7 +98,7 @@ export default function ClientRegisterPage() {
             </div>
           )}
 
-          <form onSubmit={handleRegister} className="space-y-4">
+          <form onSubmit={handleRegister} className="space-y-4" noValidate>
             <div>
               <label className="block text-xs font-semibold text-slate-400 uppercase tracking-wider mb-2">
                 Vollständiger Name
@@ -91,9 +108,11 @@ export default function ClientRegisterPage() {
                 placeholder="Max Mustermann"
                 value={name}
                 onChange={(e) => setName(e.target.value)}
-                className="w-full bg-slate-950 border border-slate-800 rounded-xl px-4 py-3 text-sm text-white focus:outline-none focus:border-emerald-500"
-                required
+                className={`w-full bg-slate-950 border rounded-xl px-4 py-3 text-sm text-white focus:outline-none transition ${
+                  fieldErrors.name ? 'border-red-500/60 focus:border-red-500' : 'border-slate-800 focus:border-emerald-500'
+                }`}
               />
+              <FormFieldError message={fieldErrors.name} />
             </div>
             <div>
               <label className="block text-xs font-semibold text-slate-400 uppercase tracking-wider mb-2">
@@ -104,9 +123,11 @@ export default function ClientRegisterPage() {
                 placeholder="name@example.com"
                 value={email}
                 onChange={(e) => setEmail(e.target.value)}
-                className="w-full bg-slate-950 border border-slate-800 rounded-xl px-4 py-3 text-sm text-white focus:outline-none focus:border-emerald-500"
-                required
+                className={`w-full bg-slate-950 border rounded-xl px-4 py-3 text-sm text-white focus:outline-none transition ${
+                  fieldErrors.email ? 'border-red-500/60 focus:border-red-500' : 'border-slate-800 focus:border-emerald-500'
+                }`}
               />
+              <FormFieldError message={fieldErrors.email} />
             </div>
             <div>
               <label className="block text-xs font-semibold text-slate-400 uppercase tracking-wider mb-2">
@@ -117,14 +138,31 @@ export default function ClientRegisterPage() {
                 placeholder="••••••••"
                 value={password}
                 onChange={(e) => setPassword(e.target.value)}
-                className="w-full bg-slate-950 border border-slate-800 rounded-xl px-4 py-3 text-sm text-white focus:outline-none focus:border-emerald-500"
-                required
+                className={`w-full bg-slate-950 border rounded-xl px-4 py-3 text-sm text-white focus:outline-none transition ${
+                  fieldErrors.password ? 'border-red-500/60 focus:border-red-500' : 'border-slate-800 focus:border-emerald-500'
+                }`}
               />
+              <FormFieldError message={fieldErrors.password} />
+            </div>
+            <div>
+              <label className="block text-xs font-semibold text-slate-400 uppercase tracking-wider mb-2">
+                Passwort bestätigen
+              </label>
+              <input
+                type="password"
+                placeholder="••••••••"
+                value={confirmPassword}
+                onChange={(e) => setConfirmPassword(e.target.value)}
+                className={`w-full bg-slate-950 border rounded-xl px-4 py-3 text-sm text-white focus:outline-none transition ${
+                  fieldErrors.confirmPassword ? 'border-red-500/60 focus:border-red-500' : 'border-slate-800 focus:border-emerald-500'
+                }`}
+              />
+              <FormFieldError message={fieldErrors.confirmPassword} />
             </div>
             <button
               type="submit"
               disabled={loading}
-              className="w-full bg-emerald-500 hover:bg-emerald-600 text-slate-950 font-bold py-3 rounded-xl text-sm transition cursor-pointer"
+              className="w-full bg-emerald-500 hover:bg-emerald-600 text-slate-950 font-bold py-3 rounded-xl text-sm transition cursor-pointer disabled:opacity-60 mt-2"
             >
               {loading ? 'Erstelle Konto...' : 'Registrieren'}
             </button>

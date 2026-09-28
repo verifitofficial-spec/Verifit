@@ -4,24 +4,41 @@ import { useState } from 'react';
 import { useRouter } from 'next/navigation';
 import Link from 'next/link';
 import { supabase } from '@/app/lib/supabase';
+import { registerSchema } from '@/app/lib/validation/authSchemas';
+import { FormFieldError } from '@/components/FormError';
 
 export default function TrainerRegisterPage() {
   const [name, setName] = useState('');
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
+  const [confirmPassword, setConfirmPassword] = useState('');
   const [bio, setBio] = useState('');
   const [loading, setLoading] = useState(false);
   const [errorMessage, setErrorMessage] = useState('');
+  const [fieldErrors, setFieldErrors] = useState<{ name?: string; email?: string; password?: string; confirmPassword?: string }>({});
   const router = useRouter();
 
   async function handleRegister(e: React.FormEvent) {
     e.preventDefault();
-    setLoading(true);
     setErrorMessage('');
+    setFieldErrors({});
+
+    const result = registerSchema.safeParse({ name, email, password, confirmPassword });
+    if (!result.success) {
+      const errors: { name?: string; email?: string; password?: string; confirmPassword?: string } = {};
+      for (const issue of result.error.issues) {
+        const key = issue.path[0] as 'name' | 'email' | 'password' | 'confirmPassword';
+        if (!errors[key]) errors[key] = issue.message;
+      }
+      setFieldErrors(errors);
+      return;
+    }
+
+    setLoading(true);
 
     const { data: authData, error: authError } = await supabase.auth.signUp({
-      email,
-      password,
+      email: result.data.email,
+      password: result.data.password,
       options: {
         data: {
           role: 'trainer', // Übergibt die Rolle an den Datenbank-Trigger für die profiles-Tabelle
@@ -41,8 +58,8 @@ export default function TrainerRegisterPage() {
       const { error: dbError } = await supabase.from('trainers').insert([
         {
           id: user.id, // Verknüpft den Trainer direkt mit der Supabase Auth-ID
-          name,
-          email,
+          name: result.data.name,
+          email: result.data.email,
           bio,
           status: 'pending',
         },
@@ -82,7 +99,7 @@ export default function TrainerRegisterPage() {
             </div>
           )}
 
-          <form onSubmit={handleRegister} className="space-y-4">
+          <form onSubmit={handleRegister} className="space-y-4" noValidate>
             <div>
               <label className="block text-xs font-semibold text-slate-400 uppercase tracking-wider mb-2">
                 Vollständiger Name
@@ -92,9 +109,11 @@ export default function TrainerRegisterPage() {
                 placeholder="Max Mustermann"
                 value={name}
                 onChange={(e) => setName(e.target.value)}
-                className="w-full bg-slate-950 border border-slate-800 rounded-xl px-4 py-3 text-sm text-white focus:outline-none focus:border-emerald-500"
-                required
+                className={`w-full bg-slate-950 border rounded-xl px-4 py-3 text-sm text-white focus:outline-none transition ${
+                  fieldErrors.name ? 'border-red-500/60 focus:border-red-500' : 'border-slate-800 focus:border-emerald-500'
+                }`}
               />
+              <FormFieldError message={fieldErrors.name} />
             </div>
 
             <div>
@@ -106,9 +125,11 @@ export default function TrainerRegisterPage() {
                 placeholder="name@example.com"
                 value={email}
                 onChange={(e) => setEmail(e.target.value)}
-                className="w-full bg-slate-950 border border-slate-800 rounded-xl px-4 py-3 text-sm text-white focus:outline-none focus:border-emerald-500"
-                required
+                className={`w-full bg-slate-950 border rounded-xl px-4 py-3 text-sm text-white focus:outline-none transition ${
+                  fieldErrors.email ? 'border-red-500/60 focus:border-red-500' : 'border-slate-800 focus:border-emerald-500'
+                }`}
               />
+              <FormFieldError message={fieldErrors.email} />
             </div>
 
             <div>
@@ -120,9 +141,27 @@ export default function TrainerRegisterPage() {
                 placeholder="••••••••"
                 value={password}
                 onChange={(e) => setPassword(e.target.value)}
-                className="w-full bg-slate-950 border border-slate-800 rounded-xl px-4 py-3 text-sm text-white focus:outline-none focus:border-emerald-500"
-                required
+                className={`w-full bg-slate-950 border rounded-xl px-4 py-3 text-sm text-white focus:outline-none transition ${
+                  fieldErrors.password ? 'border-red-500/60 focus:border-red-500' : 'border-slate-800 focus:border-emerald-500'
+                }`}
               />
+              <FormFieldError message={fieldErrors.password} />
+            </div>
+
+            <div>
+              <label className="block text-xs font-semibold text-slate-400 uppercase tracking-wider mb-2">
+                Passwort bestätigen
+              </label>
+              <input
+                type="password"
+                placeholder="••••••••"
+                value={confirmPassword}
+                onChange={(e) => setConfirmPassword(e.target.value)}
+                className={`w-full bg-slate-950 border rounded-xl px-4 py-3 text-sm text-white focus:outline-none transition ${
+                  fieldErrors.confirmPassword ? 'border-red-500/60 focus:border-red-500' : 'border-slate-800 focus:border-emerald-500'
+                }`}
+              />
+              <FormFieldError message={fieldErrors.confirmPassword} />
             </div>
 
             <div>
@@ -140,7 +179,7 @@ export default function TrainerRegisterPage() {
             <button
               type="submit"
               disabled={loading}
-              className="w-full bg-emerald-500 hover:bg-emerald-600 text-slate-950 font-bold py-3 rounded-xl text-sm transition shadow-lg shadow-emerald-500/20 cursor-pointer mt-2"
+              className="w-full bg-emerald-500 hover:bg-emerald-600 text-slate-950 font-bold py-3 rounded-xl text-sm transition shadow-lg shadow-emerald-500/20 cursor-pointer mt-2 disabled:opacity-60"
             >
               {loading ? 'Registriere...' : 'Konto erstellen'}
             </button>

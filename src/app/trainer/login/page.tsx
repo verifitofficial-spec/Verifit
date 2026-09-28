@@ -4,60 +4,77 @@ import { useState } from 'react';
 import { useRouter } from 'next/navigation';
 import Link from 'next/link';
 import { supabase } from '@/app/lib/supabase';
+import { loginSchema } from '@/app/lib/validation/authSchemas';
+import { FormFieldError } from '@/components/FormError';
 
-export default function LoginPage() {
+export default function TrainerLoginPage() {
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [loading, setLoading] = useState(false);
   const [errorMessage, setErrorMessage] = useState('');
+  const [fieldErrors, setFieldErrors] = useState<{ email?: string; password?: string }>({});
   const router = useRouter();
 
   async function handleLogin(e: React.FormEvent) {
     e.preventDefault();
-    setLoading(true);
     setErrorMessage('');
+    setFieldErrors({});
+
+    const result = loginSchema.safeParse({ email, password });
+    if (!result.success) {
+      const errors: { email?: string; password?: string } = {};
+      for (const issue of result.error.issues) {
+        const key = issue.path[0] as 'email' | 'password';
+        if (!errors[key]) errors[key] = issue.message;
+      }
+      setFieldErrors(errors);
+      return;
+    }
+
+    setLoading(true);
 
     const { data, error } = await supabase.auth.signInWithPassword({
-      email,
-      password,
+      email: result.data.email,
+      password: result.data.password,
     });
 
     if (error) {
       setErrorMessage(error.message);
       setLoading(false);
-    } else {
-      const user = data.user;
-      if (user) {
-        // Sicherheitsprüfung: Prüfen, ob der User laut zentraler profiles-Tabelle ein Trainer ist
-        const { data: profileData, error: profileError } = await supabase
-          .from('profiles')
-          .select('role')
-          .eq('id', user.id)
-          .single();
+      return;
+    }
 
-        if (profileError || !profileData || profileData.role !== 'trainer') {
-          await supabase.auth.signOut();
-          setErrorMessage('Zugriff verwehrt. Dieser Account ist kein Trainer-Konto.');
-          setLoading(false);
-          return;
-        }
+    const user = data.user;
+    if (user) {
+      // Sicherheitsprüfung: Prüfen, ob der User laut zentraler profiles-Tabelle ein Trainer ist[cite: 5]
+      const { data: profileData, error: profileError } = await supabase
+        .from('profiles')
+        .select('role')
+        .eq('id', user.id)
+        .single();
 
-        // Wir holen die echte Trainer-ID anhand der E-Mail aus der trainers-Tabelle[cite: 7]
-        const { data: trainerData, error: trainerError } = await supabase
-          .from('trainers')
-          .select('id')
-          .eq('email', user.email)
-          .single();
-
-        if (trainerData) {
-          router.push(`/trainer/${trainerData.id}/dashboard`);
-        } else {
-          setErrorMessage('Kein Trainer-Profil zu diesem Account gefunden.');
-          setLoading(false);
-        }
-      } else {
-        router.push('/trainer/list');
+      if (profileError || !profileData || profileData.role !== 'trainer') {
+        await supabase.auth.signOut();
+        setErrorMessage('Zugriff verwehrt. Dieser Account ist kein Trainer-Konto.');
+        setLoading(false);
+        return;
       }
+
+      // Wir holen die echte Trainer-ID anhand der E-Mail aus der trainers-Tabelle[cite: 5]
+      const { data: trainerData, error: trainerError } = await supabase
+        .from('trainers')
+        .select('id')
+        .eq('email', user.email)
+        .single();
+
+      if (trainerData) {
+        router.push(`/trainer/${trainerData.id}/dashboard`);
+      } else {
+        setErrorMessage('Kein Trainer-Profil zu diesem Account gefunden.');
+        setLoading(false);
+      }
+    } else {
+      router.push('/trainer/list');
     }
   }
 
@@ -85,7 +102,7 @@ export default function LoginPage() {
             </div>
           )}
 
-          <form onSubmit={handleLogin} className="space-y-4">
+          <form onSubmit={handleLogin} className="space-y-4" noValidate>
             <div>
               <label className="block text-xs font-semibold text-slate-400 uppercase tracking-wider mb-2">
                 E-Mail-Adresse
@@ -95,9 +112,11 @@ export default function LoginPage() {
                 placeholder="name@example.com"
                 value={email}
                 onChange={(e) => setEmail(e.target.value)}
-                className="w-full bg-slate-950 border border-slate-800 rounded-xl px-4 py-3 text-sm text-white focus:outline-none focus:border-emerald-500"
-                required
+                className={`w-full bg-slate-950 border rounded-xl px-4 py-3 text-sm text-white focus:outline-none transition ${
+                  fieldErrors.email ? 'border-red-500/60 focus:border-red-500' : 'border-slate-800 focus:border-emerald-500'
+                }`}
               />
+              <FormFieldError message={fieldErrors.email} />
             </div>
 
             <div>
@@ -109,15 +128,17 @@ export default function LoginPage() {
                 placeholder="••••••••"
                 value={password}
                 onChange={(e) => setPassword(e.target.value)}
-                className="w-full bg-slate-950 border border-slate-800 rounded-xl px-4 py-3 text-sm text-white focus:outline-none focus:border-emerald-500"
-                required
+                className={`w-full bg-slate-950 border rounded-xl px-4 py-3 text-sm text-white focus:outline-none transition ${
+                  fieldErrors.password ? 'border-red-500/60 focus:border-red-500' : 'border-slate-800 focus:border-emerald-500'
+                }`}
               />
+              <FormFieldError message={fieldErrors.password} />
             </div>
 
             <button
               type="submit"
               disabled={loading}
-              className="w-full bg-emerald-500 hover:bg-emerald-600 text-slate-950 font-bold py-3 rounded-xl text-sm transition shadow-lg shadow-emerald-500/20 cursor-pointer mt-2"
+              className="w-full bg-emerald-500 hover:bg-emerald-600 text-slate-950 font-bold py-3 rounded-xl text-sm transition shadow-lg shadow-emerald-500/20 cursor-pointer mt-2 disabled:opacity-60"
             >
               {loading ? 'Logge ein...' : 'Anmelden'}
             </button>
@@ -125,7 +146,7 @@ export default function LoginPage() {
 
           <div className="mt-6 text-center text-xs text-slate-500">
             Noch kein Konto?{' '}
-            <Link href="/register" className="text-emerald-400 hover:underline">
+            <Link href="/trainer/register" className="text-emerald-400 hover:underline">
               Jetzt registrieren
             </Link>
           </div>

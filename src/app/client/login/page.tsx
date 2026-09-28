@@ -4,22 +4,38 @@ import { useState } from 'react';
 import { useRouter } from 'next/navigation';
 import Link from 'next/link';
 import { supabase } from '@/app/lib/supabase';
+import { loginSchema } from '@/app/lib/validation/authSchemas';
+import { FormFieldError } from '@/components/FormError';
 
 export default function ClientLoginPage() {
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [loading, setLoading] = useState(false);
   const [errorMessage, setErrorMessage] = useState('');
+  const [fieldErrors, setFieldErrors] = useState<{ email?: string; password?: string }>({});
   const router = useRouter();
 
   async function handleLogin(e: React.FormEvent) {
     e.preventDefault();
-    setLoading(true);
     setErrorMessage('');
+    setFieldErrors({});
+
+    const result = loginSchema.safeParse({ email, password });
+    if (!result.success) {
+      const errors: { email?: string; password?: string } = {};
+      for (const issue of result.error.issues) {
+        const key = issue.path[0] as 'email' | 'password';
+        if (!errors[key]) errors[key] = issue.message;
+      }
+      setFieldErrors(errors);
+      return;
+    }
+
+    setLoading(true);
 
     const { data, error } = await supabase.auth.signInWithPassword({
-      email,
-      password,
+      email: result.data.email,
+      password: result.data.password,
     });
 
     if (error) {
@@ -35,7 +51,6 @@ export default function ClientLoginPage() {
       return;
     }
 
-    // Sicherheitsprüfung: Prüfen, ob der User laut zentraler profiles-Tabelle ein Client ist
     const { data: profileData, error: profileError } = await supabase
       .from('profiles')
       .select('role')
@@ -49,7 +64,6 @@ export default function ClientLoginPage() {
       return;
     }
 
-    // Prüfen, ob ein Eintrag in 'clients' mit dieser Auth-ID existiert
     const { data: existingClient } = await supabase
       .from('clients')
       .select('id')
@@ -57,7 +71,6 @@ export default function ClientLoginPage() {
       .single();
 
     if (!existingClient) {
-      // Falls nur ein alter Eintrag mit abweichender ID existiert, löschen wir diesen nach E-Mail und legen ihn mit der echten Auth-ID an
       await supabase.from('clients').delete().eq('email', user.email);
 
       const { error: insertError } = await supabase.from('clients').insert([
@@ -101,7 +114,7 @@ export default function ClientLoginPage() {
             </div>
           )}
 
-          <form onSubmit={handleLogin} className="space-y-4">
+          <form onSubmit={handleLogin} className="space-y-4" noValidate>
             <div>
               <label className="block text-xs font-semibold text-slate-400 uppercase tracking-wider mb-2">
                 E-Mail-Adresse
@@ -111,9 +124,11 @@ export default function ClientLoginPage() {
                 placeholder="name@example.com"
                 value={email}
                 onChange={(e) => setEmail(e.target.value)}
-                className="w-full bg-slate-950 border border-slate-800 rounded-xl px-4 py-3 text-sm text-white focus:outline-none focus:border-emerald-500"
-                required
+                className={`w-full bg-slate-950 border rounded-xl px-4 py-3 text-sm text-white focus:outline-none transition ${
+                  fieldErrors.email ? 'border-red-500/60 focus:border-red-500' : 'border-slate-800 focus:border-emerald-500'
+                }`}
               />
+              <FormFieldError message={fieldErrors.email} />
             </div>
             <div>
               <label className="block text-xs font-semibold text-slate-400 uppercase tracking-wider mb-2">
@@ -124,14 +139,16 @@ export default function ClientLoginPage() {
                 placeholder="••••••••"
                 value={password}
                 onChange={(e) => setPassword(e.target.value)}
-                className="w-full bg-slate-950 border border-slate-800 rounded-xl px-4 py-3 text-sm text-white focus:outline-none focus:border-emerald-500"
-                required
+                className={`w-full bg-slate-950 border rounded-xl px-4 py-3 text-sm text-white focus:outline-none transition ${
+                  fieldErrors.password ? 'border-red-500/60 focus:border-red-500' : 'border-slate-800 focus:border-emerald-500'
+                }`}
               />
+              <FormFieldError message={fieldErrors.password} />
             </div>
             <button
               type="submit"
               disabled={loading}
-              className="w-full bg-emerald-500 hover:bg-emerald-600 text-slate-950 font-bold py-3 rounded-xl text-sm transition cursor-pointer"
+              className="w-full bg-emerald-500 hover:bg-emerald-600 text-slate-950 font-bold py-3 rounded-xl text-sm transition cursor-pointer disabled:opacity-60"
             >
               {loading ? 'Logge ein...' : 'Anmelden'}
             </button>

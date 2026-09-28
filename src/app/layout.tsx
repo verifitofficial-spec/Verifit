@@ -13,12 +13,29 @@ const geistMono = Geist_Mono({
 });
 
 export const metadata: Metadata = {
-  title: "VeriFit — Verifizierte Personal Trainer",
+  metadataBase: new URL('https://verifit.online'),
+  title: {
+    default: "VeriFit — Verifizierte Personal Trainer",
+    template: "%s | VeriFit",
+  },
   description:
     "VeriFit verbindet dich mit manuell geprüften Personal Trainern für Fitness, Reha und Longevity in der DACH-Region.",
+  openGraph: {
+    title: "VeriFit — Verifizierte Personal Trainer",
+    description:
+      "VeriFit verbindet dich mit manuell geprüften Personal Trainern für Fitness, Reha und Longevity in der DACH-Region.",
+    url: 'https://verifit.online',
+    siteName: 'VeriFit',
+    locale: 'de_DE',
+    type: 'website',
+  },
+  robots: {
+    index: true,
+    follow: true,
+  },
 };
 
-export default function RootLayout({ children }: LayoutProps<"/">) {
+export default function RootLayout({ children }: { children: React.ReactNode }) {
   return (
     <html
       lang="de"

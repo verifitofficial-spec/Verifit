@@ -352,7 +352,6 @@ export default function TrainerDashboard() {
         setInsuranceDocPath(data.insurance_document_path || '');
 
         loadSlots(data.id);
-        loadBookingRequests(data.id);
         loadClients();
         loadFoodDatabase();
       }
@@ -445,18 +444,12 @@ export default function TrainerDashboard() {
     if (data) setSlots(data);
   }
 
-  async function loadBookingRequests(trainerId: string) {
-    const { data } = await supabase
-      .from('trainer_slots')
-      .select('*, users(name, email)')
-      .eq('trainer_id', trainerId)
-      .in('status', ['pending', 'booked'])
-      .order('slot_date', { ascending: true });
-    if (data) {}
-  }
-
   async function loadClients() {
-    const { data } = await supabase.from('users').select('*');
+    const { data, error } = await supabase.from('clients').select('id, name, email');
+    if (error) {
+      console.error('Fehler beim Laden der Kunden:', error.message);
+      return;
+    }
     if (data) setClients(data);
   }
 
@@ -757,7 +750,6 @@ export default function TrainerDashboard() {
         alert('Fehler beim Löschen des Slots: ' + error.message);
       } else {
         loadSlots(trainer.id);
-        loadBookingRequests(trainer.id);
       }
     } else {
       const payload = {
@@ -774,7 +766,6 @@ export default function TrainerDashboard() {
         alert('Fehler beim Erstellen des Slots: ' + error.message);
       } else {
         loadSlots(trainer.id);
-        loadBookingRequests(trainer.id);
       }
     }
   }
