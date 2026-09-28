@@ -38,23 +38,30 @@ export default function DatenschutzPage() {
             </div>
 
             <div>
-              <h2 className="text-white font-bold text-base mb-1">3. Zahlungsabwicklung (Stripe)</h2>
+              <h2 className="text-white font-bold text-base mb-1">3. Verarbeitung besonderer Kategorien von Daten (Gesundheitsdaten)</h2>
+              <p>
+                Im Rahmen unseres Angebots erheben und verarbeiten wir von Ihnen ggf. freiwillig gemachte Angaben zu Ihren Fitnesszielen, Körperwerten, Gewichten oder allgemeinen gesundheitlichen Voraussetzungen (Art. 9 DSGVO). Dies erfolgt ausschließlich auf Grundlage Ihrer ausdrücklichen Einwilligung, die Sie bei der Registrierung erteilen.
+              </p>
+            </div>
+
+            <div>
+              <h2 className="text-white font-bold text-base mb-1">4. Zahlungsabwicklung (Stripe)</h2>
               <p>
                 Zur Abwicklung von Zahlungen nutzen wir den Zahlungsdienstleister Stripe. Bei Bezahlung werden Ihre Zahlungsdaten direkt an Stripe übermittelt. Die Verarbeitung erfolgt auf Grundlage von Art. 6 Abs. 1 lit. b DSGVO (Vertragserfüllung). Weitere Details entnehmen Sie der Datenschutzerklärung von Stripe.
               </p>
             </div>
 
             <div>
-              <h2 className="text-white font-bold text-base mb-1">4. E-Mail-Versand (Resend)</h2>
+              <h2 className="text-white font-bold text-base mb-1">5. E-Mail-Versand (Resend)</h2>
               <p>
                 Für den automatisierten Versand von Benachrichtigungen und Buchungsbestätigungen nutzen wir den Dienst Resend. Ihre E-Mail-Adresse und relevanten Buchungsdaten werden hierfür verarbeitet.
               </p>
             </div>
 
             <div>
-              <h2 className="text-white font-bold text-base mb-1">5. Ihre Rechte</h2>
+              <h2 className="text-white font-bold text-base mb-1">6. Ihre Rechte</h2>
               <p>
-                Sie haben jederzeit das Recht auf unentgeltliche Auskunft über Ihre gespeicherten personenbezogenen Daten, deren Herkunft und Empfänger und den Zweck der Datenarbeitung sowie ein Recht auf Berichtigung oder Löschung dieser Daten.
+                Sie haben jederzeit das Recht auf unentgeltliche Auskunft über Ihre gespeicherten personenbezogenen Daten, deren Herkunft und Empfänger und den Zweck der Datenverarbeitung sowie ein Recht auf Berichtigung oder Löschung dieser Daten.
               </p>
             </div>
           </div>
@@ -62,8 +69,13 @@ export default function DatenschutzPage() {
       </section>
 
       {/* Footer */}
-      <footer className="border-t border-slate-900 py-6 text-center text-xs text-slate-600 max-w-7xl mx-auto w-full">
-        &copy; {new Date().getFullYear()} VeriFit. Alle Rechte vorbehalten.
+      <footer className="border-t border-slate-900 py-6 text-center text-xs text-slate-500 max-w-7xl mx-auto w-full space-y-2">
+        <p>&copy; {new Date().getFullYear()} VeriFit. Alle Rechte vorbehalten.</p>
+        <div className="flex justify-center items-center gap-4">
+          <Link href="/impressum" className="hover:text-emerald-400 transition">Impressum</Link>
+          <Link href="/datenschutz" className="hover:text-emerald-400 transition">Datenschutz</Link>
+          <Link href="/agb" className="hover:text-emerald-400 transition">AGB</Link>
+        </div>
       </footer>
     </main>
   );

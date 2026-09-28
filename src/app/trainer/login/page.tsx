@@ -46,7 +46,7 @@ export default function TrainerLoginPage() {
 
     const user = data.user;
     if (user) {
-      // Sicherheitsprüfung: Prüfen, ob der User laut zentraler profiles-Tabelle ein Trainer ist[cite: 5]
+      // Sicherheitsprüfung: Prüfen, ob der User laut zentraler profiles-Tabelle ein Trainer ist
       const { data: profileData, error: profileError } = await supabase
         .from('profiles')
         .select('role')
@@ -60,7 +60,7 @@ export default function TrainerLoginPage() {
         return;
       }
 
-      // Wir holen die echte Trainer-ID anhand der E-Mail aus der trainers-Tabelle[cite: 5]
+      // Wir holen die echte Trainer-ID anhand der E-Mail aus der trainers-Tabelle
       const { data: trainerData, error: trainerError } = await supabase
         .from('trainers')
         .select('id')

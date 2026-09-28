@@ -159,6 +159,21 @@ export default function ClientRegisterPage() {
               />
               <FormFieldError message={fieldErrors.confirmPassword} />
             </div>
+
+            {/* DSGVO-Einwilligung für Gesundheitsdaten */}
+            <div className="flex items-start gap-3 mt-4 mb-6 text-left">
+              <input
+                type="checkbox"
+                id="healthDataConsent"
+                name="healthDataConsent"
+                required
+                className="mt-1 w-4 h-4 rounded border-slate-700 bg-slate-950 text-emerald-500 focus:ring-emerald-500 cursor-pointer"
+              />
+              <label htmlFor="healthDataConsent" className="text-xs text-slate-400 leading-tight">
+                Ich willige ausdrücklich ein, dass meine sensiblen Gesundheitsdaten (wie Körpergewicht, Stimmung, Schlaf) zur Auswertung und Anpassung meiner Trainingsziele durch VeriFit und verbundene Trainer verarbeitet werden (gemäß Art. 9 DSGVO). Diese Einwilligung kann ich jederzeit widerrufen.
+              </label>
+            </div>
+
             <button
               type="submit"
               disabled={loading}
@@ -177,8 +192,13 @@ export default function ClientRegisterPage() {
         </div>
       </section>
 
-      <footer className="border-t border-slate-900 py-6 text-center text-xs text-slate-600 max-w-7xl mx-auto w-full">
-        &copy; {new Date().getFullYear()} VeriFit. Alle Rechte vorbehalten.
+      <footer className="border-t border-slate-900 py-6 text-center text-xs text-slate-500 max-w-7xl mx-auto w-full space-y-2">
+        <p>&copy; {new Date().getFullYear()} VeriFit. Alle Rechte vorbehalten.</p>
+        <div className="flex justify-center items-center gap-4">
+          <Link href="/impressum" className="hover:text-emerald-400 transition">Impressum</Link>
+          <Link href="/datenschutz" className="hover:text-emerald-400 transition">Datenschutz</Link>
+          <Link href="/agb" className="hover:text-emerald-400 transition">AGB</Link>
+        </div>
       </footer>
     </main>
   );

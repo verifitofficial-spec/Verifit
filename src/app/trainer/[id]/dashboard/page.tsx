@@ -202,7 +202,7 @@ export default function TrainerDashboard() {
   const [currentYear, setCurrentYear] = useState(todayObj.getFullYear());
   const [currentMonth, setCurrentMonth] = useState(todayObj.getMonth());
   const [selectedCalendarDate, setSelectedCalendarDate] = useState<string>(
-    todayObj.toISOString().split('T')[0]
+    todayObj.toLocaleDateString('en-CA')
   );
 
   const [activeCalendarTab, setActiveCalendarTab] = useState<'schedule' | 'offers'>('schedule');

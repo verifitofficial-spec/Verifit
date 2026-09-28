@@ -20,7 +20,7 @@ export default function ImpressumPage() {
           
           <div className="space-y-6 text-slate-300 text-sm leading-relaxed">
             <div>
-              <h2 className="text-white font-bold text-base mb-1">Angaben gemäß § 5 TMG</h2>
+              <h2 className="text-white font-bold text-base mb-1">Angaben gemäß § 5 DDG</h2>
               <p>[Dein Vorname & Nachname oder Firmenname]</p>
               <p>[Straße und Hausnummer]</p>
               <p>[PLZ und Ort]</p>
@@ -33,7 +33,7 @@ export default function ImpressumPage() {
             </div>
 
             <div>
-              <h2 className="text-white font-bold text-base mb-1">Verantwortlich für den Inhalt nach § 55 Abs. 2 RStV</h2>
+              <h2 className="text-white font-bold text-base mb-1">Verantwortlich für den Inhalt nach § 18 Abs. 2 MStV</h2>
               <p>[Dein Vorname & Nachname]</p>
               <p>[Adresse wie oben]</p>
             </div>
@@ -41,7 +41,7 @@ export default function ImpressumPage() {
             <div>
               <h2 className="text-white font-bold text-base mb-1">Haftungsausschluss (Disclaimer)</h2>
               <p>
-                <strong>Haftung für Inhalte:</strong> Als Diensteanbieter sind wir gemäß § 7 Abs.1 TMG für eigene Inhalte auf diesen Seiten nach den allgemeinen Gesetzen verantwortlich. Nach §§ 8 bis 10 TMG sind wir als Diensteanbieter jedoch nicht verpflichtet, übermittelte oder gespeicherte fremde Informationen zu überwachen oder nach Umständen zu forschen, die auf eine rechtswidrige Tätigkeit hinweisen.
+                <strong>Haftung für Inhalte:</strong> Als Diensteanbieter sind wir gemäß § 7 Abs. 1 TMG für eigene Inhalte auf diesen Seiten nach den allgemeinen Gesetzen verantwortlich. Nach §§ 8 bis 10 TMG sind wir als Diensteanbieter jedoch nicht verpflichtet, übermittelte oder gespeicherte fremde Informationen zu überwachen oder nach Umständen zu forschen, die auf eine rechtswidrige Tätigkeit hinweisen.
               </p>
               <p className="mt-2">
                 <strong>Haftung für Links:</strong> Unser Angebot enthält Links zu externen Websites Dritter, auf deren Inhalte wir keinen Einfluss haben. Deshalb können wir für diese fremden Inhalte auch keine Gewähr übernehmen. Für die Inhalte der verlinkten Seiten ist stets der jeweilige Anbieter oder Betreiber der Seiten verantwortlich.
@@ -52,8 +52,13 @@ export default function ImpressumPage() {
       </section>
 
       {/* Footer */}
-      <footer className="border-t border-slate-900 py-6 text-center text-xs text-slate-600 max-w-7xl mx-auto w-full">
-        &copy; {new Date().getFullYear()} VeriFit. Alle Rechte vorbehalten.
+      <footer className="border-t border-slate-900 py-6 text-center text-xs text-slate-500 max-w-7xl mx-auto w-full space-y-2">
+        <p>&copy; {new Date().getFullYear()} VeriFit. Alle Rechte vorbehalten.</p>
+        <div className="flex justify-center items-center gap-4">
+          <Link href="/impressum" className="hover:text-emerald-400 transition">Impressum</Link>
+          <Link href="/datenschutz" className="hover:text-emerald-400 transition">Datenschutz</Link>
+          <Link href="/agb" className="hover:text-emerald-400 transition">AGB</Link>
+        </div>
       </footer>
     </main>
   );

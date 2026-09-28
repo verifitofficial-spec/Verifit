@@ -141,6 +141,22 @@ export default function QuizPage() {
   const calculateDynamicBudgetRange = (currentAnswers: QuizAnswers) => {
     let relevantTrainers = [...trainers];
 
+    // Erfahrung (Experience) Filter einbinden
+    if (currentAnswers.experience) {
+        relevantTrainers = relevantTrainers.filter(t => {
+            if (!t.bio && !t.specialties) return true;
+            const context = `${t.bio || ''} ${t.specialties || ''}`.toLowerCase();
+            const exp = currentAnswers.experience.toLowerCase();
+            
+            // Wenn der Nutzer Anfänger ist, schließe Trainer aus, die sich nur an Profis/Leistungssportler richten
+            if (exp === 'anfänger' && (context.includes('nur profis') || context.includes('leistungssportler'))) return false;
+            // Wenn der Nutzer Profi ist, schließe Trainer aus, die sich nur an Anfänger richten
+            if (exp === 'profi' && (context.includes('nur anfänger') || context.includes('einsteiger'))) return false;
+            
+            return true;
+        });
+    }
+
     if (currentAnswers.goal) {
       relevantTrainers = relevantTrainers.filter(t => {
         if (!t.specialties) return false;
@@ -179,6 +195,20 @@ export default function QuizPage() {
     setView('results');
 
     let results = [...trainers];
+
+    // Erfahrung (Experience) beim finalen Matching filtern
+    if (finalAnswers.experience) {
+        results = results.filter(t => {
+            if (!t.bio && !t.specialties) return true;
+            const context = `${t.bio || ''} ${t.specialties || ''}`.toLowerCase();
+            const exp = finalAnswers.experience.toLowerCase();
+            
+            if (exp === 'anfänger' && (context.includes('nur profis') || context.includes('leistungssportler'))) return false;
+            if (exp === 'profi' && (context.includes('nur anfänger') || context.includes('einsteiger'))) return false;
+            
+            return true;
+        });
+    }
 
     if (finalAnswers.goal) {
       results = results.filter(t => {
@@ -518,7 +548,9 @@ function renderSlotsList(trainerSlots: any[], handleBookSlot: (slot: any) => voi
     <div key={slot.id} className="flex justify-between items-center bg-slate-950 p-3 rounded-xl border border-slate-800 text-xs">
       <div>
         <div className="font-bold">{slot.title}</div>
-        <div className="text-slate-400">{slot.slot_date} um {slot.slot_time.slice(0, 5)} Uhr • {slot.price}€</div>
+        <div className="text-slate-400">
+          {slot.slot_date} um {slot.slot_time ? slot.slot_time.slice(0, 5) : '--:--'} Uhr • {slot.price}€
+        </div>
       </div>
       <button onClick={() => handleBookSlot(slot)} className="bg-emerald-500 hover:bg-emerald-600 text-slate-950 px-3 py-1.5 rounded-lg font-bold text-xs cursor-pointer">
         Bezahlen & Buchen

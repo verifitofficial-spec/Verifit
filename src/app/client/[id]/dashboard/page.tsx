@@ -202,7 +202,7 @@ export default function ClientDashboard({ params }: { params: Promise<{ id: stri
     setSavingTracking(true);
     setTrackingSuccess(false);
 
-    const todayStr = new Date().toISOString().split('T')[0];
+    const todayStr = new Date().toLocaleDateString('en-CA');
 
     const { data: existingEntries } = await supabase
       .from('client_trackings')
@@ -211,7 +211,7 @@ export default function ClientDashboard({ params }: { params: Promise<{ id: stri
       .order('created_at', { ascending: false });
 
     const todayEntry = existingEntries?.find(entry => {
-      const entryDateStr = new Date(entry.created_at).toISOString().split('T')[0];
+      const entryDateStr = new Date(entry.created_at).toLocaleDateString('en-CA');
       return entryDateStr === todayStr;
     });
 
