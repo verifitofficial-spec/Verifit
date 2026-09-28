@@ -444,8 +444,12 @@ export default function TrainerDashboard() {
     if (data) setSlots(data);
   }
 
+  // Punkt 4: Sauber aus 'clients' auslesen (ohne verwaiste users-Abfragen)
   async function loadClients() {
-    const { data, error } = await supabase.from('clients').select('id, name, email');
+    const { data, error } = await supabase
+      .from('clients')
+      .select('id, name, email');
+      
     if (error) {
       console.error('Fehler beim Laden der Kunden:', error.message);
       return;
@@ -454,7 +458,7 @@ export default function TrainerDashboard() {
   }
 
   async function loadFoodDatabase() {
-    const { data, error } = await supabase.from('foods').select('*').order('name', { ascending: true });
+    const { data } = await supabase.from('foods').select('*').order('name', { ascending: true });
     if (data && data.length > 0) {
       setFoodDatabase(data);
     } else {
@@ -713,8 +717,9 @@ export default function TrainerDashboard() {
     return new Date(year, month + 1, 0).getDate();
   }
 
+  // ESLint Fix: prefer-const
   function getFirstDayOfMonth(year: number, month: number) {
-    let day = new Date(year, month, 1).getDay();
+    const day = new Date(year, month, 1).getDay();
     return day === 0 ? 6 : day - 1;
   }
 
