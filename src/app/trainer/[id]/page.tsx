@@ -49,48 +49,58 @@ export default function TrainerPublicProfile() {
     loadPublicData();
   }, [trainerId]);
 
+  async function reloadFreeSlots() {
+    const { data: slotData } = await supabase
+      .from('trainer_slots')
+      .select('*')
+      .eq('trainer_id', trainerId)
+      .eq('status', 'free')
+      .order('slot_date', { ascending: true });
+    
+    if (slotData) setSlots(slotData);
+  }
+
   async function handleBooking(e: React.FormEvent) {
     e.preventDefault();
     if (!bookingSlot || !clientName || !clientEmail) return;
-
+    
     setSubmitting(true);
-
-    const { error } = await supabase
-      .from('trainer_slots')
-      .update({
-        status: 'pending',
-        title: `${bookingSlot.title} (Gebucht von: ${clientName} - ${clientEmail})`
-      })
-      .eq('id', bookingSlot.id);
-
-    if (error) {
-      alert('Fehler bei der Buchung: ' + error.message);
-    } else {
-      await fetch('/api/send-email', {
+    setSuccessMessage('');
+    
+    try {
+      const res = await fetch('/api/book-slot', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
-          trainerEmail: trainer.email,
+          slotId: bookingSlot.id,
           clientName,
           clientEmail,
-          slotDate: bookingSlot.slot_date,
-          slotTime: bookingSlot.slot_time.slice(0, 5),
-          title: bookingSlot.title,
         }),
       });
-
-      setSuccessMessage('Buchungsanfrage erfolgreich abgeschickt! Der Trainer wird sich in Kürze bei dir melden.');
+      
+      const data = await res.json().catch(() => ({}));
+      
+      if (!res.ok) {
+        alert(data.error || 'Fehler bei der Buchung');
+        if (res.status === 409) {
+          setBookingSlot(null);
+          await reloadFreeSlots();
+        }
+        setSubmitting(false);
+        return;
+      }
+      
+      setSuccessMessage(
+        data.mailSent === false
+          ? 'Anfrage gespeichert! Die Bestätigungsmail konnte leider nicht zugestellt werden, der Trainer meldet sich bei dir.'
+          : 'Buchungsanfrage erfolgreich abgeschickt! Der Trainer wird sich in Kürze bei dir melden.'
+      );
       setBookingSlot(null);
       setClientName('');
       setClientEmail('');
-      
-      const { data: slotData } = await supabase
-        .from('trainer_slots')
-        .select('*')
-        .eq('trainer_id', trainerId)
-        .eq('status', 'free')
-        .order('slot_date', { ascending: true });
-      if (slotData) setSlots(slotData);
+      await reloadFreeSlots();
+    } catch {
+      alert('Netzwerkfehler bei der Buchung.');
     }
     setSubmitting(false);
   }

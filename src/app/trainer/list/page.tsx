@@ -104,22 +104,26 @@ export default function PublicTrainersPage() {
       }
     }
 
-    // Bei 0-€ / Anfrageslots: Direkt anfragen mit E-Mail & Status-Check
-    const { data, error } = await supabase
-      .from('trainer_slots')
-      .update({ 
-        status: 'pending',
-        client_email: clientEmail 
-      })
-      .eq('id', slot.id)
-      .eq('status', 'free') // Verhindert Doppelbuchung
-      .select('id');
-
-    if (error || !data || data.length === 0) {
-      setBookingMessage('Termin konnte nicht angefragt werden. Eventuell ist er bereits vergeben.');
-    } else {
-      setBookingMessage('Termin erfolgreich angefragt! Der Trainer wird benachrichtigt.');
-      openBookingModal(selectedTrainer!);
+    // Bei 0-€ / Anfrageslots: über die Server-Route (atomar + Mails)
+    try {
+      const res = await fetch('/api/book-slot', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          slotId: slot.id,
+          clientName: clientEmail.split('@')[0], // Fallback, hier gibt es kein Namensfeld
+          clientEmail,
+        }),
+      });
+      const data = await res.json().catch(() => ({}));
+      if (!res.ok) {
+        setBookingMessage(data.error || 'Termin konnte nicht angefragt werden.');
+      } else {
+        setBookingMessage('Termin erfolgreich angefragt! Der Trainer wird benachrichtigt.');
+      }
+      if (selectedTrainer) openBookingModal(selectedTrainer);
+    } catch {
+      setBookingMessage('Netzwerkfehler bei der Buchung.');
     }
   }
 
