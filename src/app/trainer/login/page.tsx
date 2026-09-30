@@ -61,7 +61,7 @@ export default function TrainerLoginPage() {
       }
 
       // Wir holen die echte Trainer-ID anhand der E-Mail aus der trainers-Tabelle
-      const { data: trainerData, error: trainerError } = await supabase
+      const { data: trainerData } = await supabase
         .from('trainers')
         .select('id')
         .eq('email', user.email)

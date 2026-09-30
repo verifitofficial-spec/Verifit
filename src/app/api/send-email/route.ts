@@ -1,6 +1,6 @@
 import { NextResponse } from 'next/server';
 import { resend } from '@/app/lib/resend';
-import { createServerClient, type CookieOptions } from '@supabase/ssr';
+import { createServerClient } from '@supabase/ssr';
 import { cookies } from 'next/headers';
 
 // Hilfsfunktion gegen HTML-Injection

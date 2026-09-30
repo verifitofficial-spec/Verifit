@@ -4,45 +4,66 @@ import { useEffect, useState } from 'react';
 import Link from 'next/link';
 import { supabase } from '@/app/lib/supabase';
 
+// 1. Typisierungen hinzufügen (behebt die 'any' Warnungen)
+interface Trainer {
+  id: string;
+  name: string;
+  bio: string | null;
+  city: string | null;
+  service_mode: string | null;
+  specialties: string | null;
+  package_category: string | null;
+  package_duration: string | null;
+  package_price: number | null;
+  availability_status: string | null;
+}
+
+interface TrainerSlot {
+  id: string;
+  title: string;
+  slot_date: string;
+  slot_time: string | null;
+  price: number | null;
+  status: string;
+}
+
 export default function PublicTrainersPage() {
-  const [trainers, setTrainers] = useState<any[]>([]);
+  const [trainers, setTrainers] = useState<Trainer[]>([]);
   const [loading, setLoading] = useState(true);
   const [cityFilter, setCityFilter] = useState('');
   const [specialtyFilter, setSpecialtyFilter] = useState('');
-  const [selectedTrainer, setSelectedTrainer] = useState<any>(null);
-  const [trainerSlots, setTrainerSlots] = useState<any[]>([]);
+  const [selectedTrainer, setSelectedTrainer] = useState<Trainer | null>(null);
+  const [trainerSlots, setTrainerSlots] = useState<TrainerSlot[]>([]);
   const [bookingMessage, setBookingMessage] = useState('');
   const [clientEmail, setClientEmail] = useState('');
 
+  // 2. Logik direkt in den useEffect verschieben (behebt den Linter-Error)
   useEffect(() => {
-    fetchApprovedTrainers();
-    loadCurrentUser();
+    async function fetchInitialData() {
+      // Aktuellen User laden
+      const { data: { user } } = await supabase.auth.getUser();
+      if (user?.email) {
+        setClientEmail(user.email);
+      }
+
+      // Trainer laden
+      const { data, error } = await supabase
+        .from('trainers')
+        .select('id, name, bio, city, service_mode, specialties, package_category, package_duration, package_price, availability_status')
+        .eq('status', 'approved');
+
+      if (error) {
+        console.error('Fehler beim Laden der Trainer:', error.message);
+      } else {
+        setTrainers(data || []);
+      }
+      setLoading(false);
+    }
+
+    fetchInitialData();
   }, []);
 
-  async function loadCurrentUser() {
-    const { data: { user } } = await supabase.auth.getUser();
-    if (user?.email) {
-      setClientEmail(user.email);
-    }
-  }
-
-  async function fetchApprovedTrainers() {
-    setLoading(true);
-    // Datenleck behoben: Nur öffentliche Profilspalten abfragen
-    const { data, error } = await supabase
-      .from('trainers')
-      .select('id, name, bio, city, service_mode, specialties, package_category, package_duration, package_price, availability_status')
-      .eq('status', 'approved');
-
-    if (error) {
-      console.error('Fehler beim Laden der Trainer:', error.message);
-    } else {
-      setTrainers(data || []);
-    }
-    setLoading(false);
-  }
-
-  async function openBookingModal(trainer: any) {
+  async function openBookingModal(trainer: Trainer) {
     setSelectedTrainer(trainer);
     setBookingMessage('');
     const { data } = await supabase
@@ -55,7 +76,7 @@ export default function PublicTrainersPage() {
     setTrainerSlots(data || []);
   }
 
-  async function handleBookSlot(slot: any) {
+  async function handleBookSlot(slot: TrainerSlot) {
     if (!clientEmail.trim()) {
       setBookingMessage('Bitte gib deine E-Mail-Adresse für die Buchung an.');
       return;
@@ -71,13 +92,13 @@ export default function PublicTrainersPage() {
         });
         const data = await res.json();
         if (data.url) {
-          window.location.href = data.url;
+          window.location.assign(data.url);
           return;
         } else {
           setBookingMessage(data.error || 'Fehler beim Starten des Checkouts');
           return;
         }
-      } catch (e) {
+      } catch {
         setBookingMessage('Netzwerkfehler beim Aufruf des Checkouts.');
         return;
       }
@@ -98,7 +119,7 @@ export default function PublicTrainersPage() {
       setBookingMessage('Termin konnte nicht angefragt werden. Eventuell ist er bereits vergeben.');
     } else {
       setBookingMessage('Termin erfolgreich angefragt! Der Trainer wird benachrichtigt.');
-      openBookingModal(selectedTrainer);
+      openBookingModal(selectedTrainer!);
     }
   }
 

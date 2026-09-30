@@ -1,13 +1,12 @@
 'use client';
 
 import { useEffect, useState } from 'react';
-import { useParams, useRouter } from 'next/navigation';
+import { useParams } from 'next/navigation';
 import Link from 'next/link';
 import { supabase } from '@/app/lib/supabase';
 
 export default function TrainerPublicProfile() {
   const params = useParams();
-  const router = useRouter();
   const trainerId = params.id as string;
 
   const [trainer, setTrainer] = useState<any>(null);

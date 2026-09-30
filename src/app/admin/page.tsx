@@ -1,6 +1,6 @@
 'use client';
 
-import { useEffect, useState } from 'react';
+import { useCallback, useEffect, useState } from 'react';
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
 import { supabase } from '@/app/lib/supabase';
@@ -41,6 +41,22 @@ export default function VerificationPage() {
   const [loading, setLoading] = useState(true);
   const router = useRouter();
 
+  // Trainer aus Supabase laden (mit useCallback nach oben verschoben)
+  const fetchTrainers = useCallback(async () => {
+    setLoading(true);
+    const { data, error } = await supabase
+      .from('trainers')
+      .select('*')
+      .order('id', { ascending: false });
+
+    if (error) {
+      console.error('Fehler beim Laden der Trainer:', error.message);
+    } else {
+      setTrainers(data || []);
+    }
+    setLoading(false);
+  }, []);
+
   // Sicherheitsprüfung und Laden der Trainer beim Start der Seite
   useEffect(() => {
     async function checkAdminSession() {
@@ -68,23 +84,7 @@ export default function VerificationPage() {
     }
 
     checkAdminSession();
-  }, [router]);
-
-  // Trainer aus Supabase laden
-  async function fetchTrainers() {
-    setLoading(true);
-    const { data, error } = await supabase
-      .from('trainers')
-      .select('*')
-      .order('id', { ascending: false });
-
-    if (error) {
-      console.error('Fehler beim Laden der Trainer:', error.message);
-    } else {
-      setTrainers(data || []);
-    }
-    setLoading(false);
-  }
+  }, [router, fetchTrainers]);
 
   // Signed URL generieren & PDF-Dokument in neuem Tab öffnen
   async function handleViewDocument(path: string) {

@@ -284,7 +284,7 @@ export default function QuizPage() {
 
     const data = await response.json();
     if (data.url) {
-      window.location.href = data.url;
+      window.location.assign(data.url);
     } else {
       setBookingMessage('Fehler beim Starten des Checkouts: ' + data.error);
     }

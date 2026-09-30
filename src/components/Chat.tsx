@@ -157,7 +157,7 @@ export default function Chat({ currentUserId }: ChatProps) {
                   const isMe = msg.sender_id === currentUserId;
                   return (
                     <div
-                      key={msg.id || Math.random()}
+                    key={msg.id ?? `${msg.created_at}-${msg.sender_id}`}
                       className={`flex ${isMe ? 'justify-end' : 'justify-start'}`}
                     >
                       <div
