@@ -452,11 +452,23 @@ export default function TrainerDashboard() {
   }
 
   async function handleRespond(bookingId: string, accept: boolean) {
-    const { error } = await supabase.rpc('respond_to_booking', {
-      p_booking_id: bookingId,
-      p_accept: accept,
+    const { data: { session } } = await supabase.auth.getSession();
+    if (!session) {
+      alert('Deine Sitzung ist abgelaufen. Bitte melde dich erneut an.');
+      return;
+    }
+
+    const response = await fetch('/api/respond-booking', {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        Authorization: `Bearer ${session.access_token}`,
+      },
+      body: JSON.stringify({ bookingId, accept }),
     });
-    if (error) { alert(error.message); return; }
+
+    const data = (await response.json().catch(() => ({}))) as { error?: string };
+    if (!response.ok) { alert(data.error || 'Buchungsantwort konnte nicht gespeichert werden.'); return; }
     if (trainer) await Promise.all([loadBookings(trainer.id), loadSlots(trainer.id)]);
   }
 
