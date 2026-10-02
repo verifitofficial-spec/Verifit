@@ -158,18 +158,20 @@ interface OfferTemplate {
   description: string;
 }
 
-interface Appointment {
+interface Booking {
   id: string;
-  title: string;
-  clientName: string;
-  clientEmail: string;
-  date: string;
-  time: string;
-  duration: number;
-  type: 'discovery' | 'paid';
+  slot_id: string | null;
+  client_id: string;
+  client_name: string;
+  client_email: string;
+  offer_title: string;
+  offer_type: 'discovery' | 'paid';
+  duration_minutes: number;
   price: number;
-  status: 'confirmed' | 'pending' | 'cancelled';
-  location: string;
+  slot_date: string;
+  slot_time: string;
+  status: 'pending' | 'accepted' | 'confirmed' | 'declined' | 'cancelled' | 'expired';
+  created_at: string;
 }
 
 export default function TrainerDashboard() {
@@ -206,27 +208,10 @@ export default function TrainerDashboard() {
   );
 
   const [activeCalendarTab, setActiveCalendarTab] = useState<'schedule' | 'offers'>('schedule');
-  const [offers, setOffers] = useState<OfferTemplate[]>([
-    {
-      id: '1',
-      title: '0€ Discovery Call (Erstgespräch)',
-      type: 'discovery',
-      duration: 30,
-      price: 0,
-      description: 'Kostenloses 30-minütiges Kennenlernen zur Analyse deiner Ziele.'
-    },
-    {
-      id: '2',
-      title: '1:1 Personal Training Session',
-      type: 'paid',
-      duration: 60,
-      price: 90,
-      description: 'Intensives 60-minütiges Einzeltraining vor Ort oder online.'
-    }
-  ]);
-  const [appointments, setAppointments] = useState<Appointment[]>([]);
+  const [offers, setOffers] = useState<OfferTemplate[]>([]);
+  const [bookings, setBookings] = useState<Booking[]>([]);
+  
   const [isOfferModalOpen, setIsOfferModalOpen] = useState(false);
-  const [isBookingModalOpen, setIsBookingModalOpen] = useState(false);
   const [currentOffer, setCurrentOffer] = useState<Partial<OfferTemplate>>({
     title: '',
     type: 'paid',
@@ -236,16 +221,7 @@ export default function TrainerDashboard() {
   });
   const [editingOfferId, setEditingOfferId] = useState<string | null>(null);
 
-  const [selectedOfferForBooking, setSelectedOfferForBooking] = useState<OfferTemplate | null>(null);
-  const [bookingClientName, setBookingClientName] = useState('');
-  const [bookingClientEmail, setBookingClientEmail] = useState('');
-  const [bookingDate, setBookingDate] = useState('');
-  const [bookingTime, setBookingTime] = useState('');
-
-  const [slotTitle, setSlotTitle] = useState('Discovery-Call / Erstgespräch');
-  const [slotPrice, setSlotPrice] = useState('0');
   const [slots, setSlots] = useState<any[]>([]);
-
   const [clients, setClients] = useState<any[]>([]);
 
   // Supabase Lebensmittel-Datenbank States
@@ -352,6 +328,8 @@ export default function TrainerDashboard() {
         setInsuranceDocPath(data.insurance_document_path || '');
 
         loadSlots(data.id);
+        loadOffers(data.id);
+        loadBookings(data.id);
         loadClients();
         loadFoodDatabase();
       }
@@ -442,6 +420,44 @@ export default function TrainerDashboard() {
       .eq('trainer_id', trainerId)
       .order('slot_date', { ascending: true });
     if (data) setSlots(data);
+  }
+
+  async function loadOffers(trainerId: string) {
+    const { data, error } = await supabase
+      .from('trainer_offers')
+      .select('*')
+      .eq('trainer_id', trainerId)
+      .eq('is_active', true)
+      .order('created_at', { ascending: true });
+    if (error) { console.error('Fehler beim Laden der Pakete:', error.message); return; }
+    setOffers((data ?? []).map((o: any) => ({
+      id: o.id,
+      title: o.title,
+      type: o.type,
+      duration: o.duration_minutes,
+      price: Number(o.price),
+      description: o.description ?? '',
+    })));
+  }
+
+  async function loadBookings(trainerId: string) {
+    const { data, error } = await supabase
+      .from('bookings')
+      .select('*')
+      .eq('trainer_id', trainerId)
+      .order('slot_date', { ascending: true })
+      .order('slot_time', { ascending: true });
+    if (error) { console.error('Fehler beim Laden der Anfragen:', error.message); return; }
+    setBookings((data ?? []).map((b: any) => ({ ...b, price: Number(b.price) })));
+  }
+
+  async function handleRespond(bookingId: string, accept: boolean) {
+    const { error } = await supabase.rpc('respond_to_booking', {
+      p_booking_id: bookingId,
+      p_accept: accept,
+    });
+    if (error) { alert(error.message); return; }
+    if (trainer) await Promise.all([loadBookings(trainer.id), loadSlots(trainer.id)]);
   }
 
   // Punkt 4: Sauber aus 'clients' auslesen (ohne verwaiste users-Abfragen)
@@ -743,100 +759,67 @@ export default function TrainerDashboard() {
 
   async function handleToggleHourSlot(timeStr: string) {
     if (!trainer || !selectedCalendarDate) return;
-
-    const formattedTime = timeStr.length === 5 ? timeStr + ':00' : timeStr;
     const existingSlot = slots.find(
       (s) => s.slot_date === selectedCalendarDate && s.slot_time.startsWith(timeStr)
     );
-
     if (existingSlot) {
-      const { error } = await supabase.from('trainer_slots').delete().eq('id', existingSlot.id);
-      if (error) {
-        alert('Fehler beim Löschen des Slots: ' + error.message);
-      } else {
-        loadSlots(trainer.id);
+      if (existingSlot.status !== 'free') {
+        alert('Dieser Slot hat eine Anfrage bzw. Buchung und kann nicht entfernt werden.');
+        return;
       }
+      const { error } = await supabase.from('trainer_slots').delete().eq('id', existingSlot.id);
+      if (error) alert('Fehler beim Löschen des Slots: ' + error.message);
+      else loadSlots(trainer.id);
     } else {
-      const payload = {
+      const { error } = await supabase.from('trainer_slots').insert({
         trainer_id: trainer.id,
         slot_date: selectedCalendarDate,
-        slot_time: formattedTime,
-        title: slotTitle,
-        price: slotPrice ? parseFloat(slotPrice) : 0,
-        status: 'free'
-      };
-
-      const { error } = await supabase.from('trainer_slots').insert(payload);
-      if (error) {
-        alert('Fehler beim Erstellen des Slots: ' + error.message);
-      } else {
-        loadSlots(trainer.id);
-      }
+        slot_time: `${timeStr}:00`,
+        status: 'free',
+      });
+      if (error) alert('Fehler beim Erstellen des Slots: ' + error.message);
+      else loadSlots(trainer.id);
     }
   }
 
-  const handleSaveOffer = (e: React.FormEvent) => {
+  const handleSaveOffer = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (!currentOffer.title) return;
-
-    if (editingOfferId) {
-      setOffers(offers.map(o => o.id === editingOfferId ? { ...o, ...currentOffer } as OfferTemplate : o));
-      setEditingOfferId(null);
-    } else {
-      const newOffer: OfferTemplate = {
-        id: Date.now().toString(),
-        title: currentOffer.title || 'Neues Angebot',
-        type: currentOffer.type || 'paid',
-        duration: Number(currentOffer.duration) || 60,
-        price: currentOffer.type === 'discovery' ? 0 : Number(currentOffer.price) || 0,
-        description: currentOffer.description || ''
-      };
-      setOffers([...offers, newOffer]);
+    if (!trainer || !currentOffer.title) return;
+    const type = currentOffer.type || 'paid';
+    const payload = {
+      trainer_id: trainer.id,
+      title: currentOffer.title,
+      type,
+      duration_minutes: Number(currentOffer.duration) || 60,
+      price: type === 'discovery' ? 0 : Number(currentOffer.price) || 0,
+      description: currentOffer.description || null,
+    };
+    if (type === 'paid' && payload.price <= 0) {
+      alert('Bezahlte Angebote brauchen einen Preis größer 0.');
+      return;
     }
-
+    const { error } = editingOfferId
+      ? await supabase.from('trainer_offers').update(payload).eq('id', editingOfferId)
+      : await supabase.from('trainer_offers').insert(payload);
+    if (error) { alert('Fehler beim Speichern: ' + error.message); return; }
+    setEditingOfferId(null);
     setCurrentOffer({ title: '', type: 'paid', duration: 60, price: 90, description: '' });
     setIsOfferModalOpen(false);
+    await loadOffers(trainer.id);
+  };
+  
+  // Soft-Delete: Buchungen behalten ihre Kopie der Paketdaten
+  const handleDeleteOffer = async (id: string) => {
+    if (!trainer) return;
+    const { error } = await supabase.from('trainer_offers').update({ is_active: false }).eq('id', id);
+    if (error) { alert('Fehler beim Löschen: ' + error.message); return; }
+    await loadOffers(trainer.id);
   };
 
   const handleEditOffer = (offer: OfferTemplate) => {
     setEditingOfferId(offer.id);
     setCurrentOffer(offer);
     setIsOfferModalOpen(true);
-  };
-
-  const handleDeleteOffer = (id: string) => {
-    setOffers(offers.filter(o => o.id !== id));
-  };
-
-  const handleCreateBooking = (e: React.FormEvent) => {
-    e.preventDefault();
-    if (!selectedOfferForBooking || !bookingClientName || !bookingDate || !bookingTime) return;
-
-    const newAppointment: Appointment = {
-      id: Date.now().toString(),
-      title: selectedOfferForBooking.title,
-      clientName: bookingClientName,
-      clientEmail: bookingClientEmail,
-      date: bookingDate,
-      time: bookingTime,
-      duration: selectedOfferForBooking.duration,
-      type: selectedOfferForBooking.type,
-      price: selectedOfferForBooking.price,
-      status: selectedOfferForBooking.type === 'discovery' ? 'confirmed' : 'pending',
-      location: 'Video Call (Zoom)'
-    };
-
-    setAppointments([...appointments, newAppointment]);
-    setIsBookingModalOpen(false);
-    setSelectedOfferForBooking(null);
-    setBookingClientName('');
-    setBookingClientEmail('');
-    setBookingDate('');
-    setBookingTime('');
-  };
-
-  const handleUpdateAppointmentStatus = (id: string, status: 'confirmed' | 'cancelled') => {
-    setAppointments(appointments.map(app => app.id === id ? { ...app, status } : app));
   };
 
   function handleDragStartTemplate(e: React.DragEvent, templateName: string) {
@@ -1111,6 +1094,17 @@ export default function TrainerDashboard() {
   }
 
   const activeTemplate = customTemplates[activeTemplateIndex] || customTemplates[0];
+
+  const activeBookings = bookings
+    .filter((b) => ['pending', 'accepted', 'confirmed'].includes(b.status))
+    .sort((a, b) =>
+      (a.status === 'pending' ? 0 : 1) - (b.status === 'pending' ? 0 : 1) ||
+      `${a.slot_date}${a.slot_time}`.localeCompare(`${b.slot_date}${b.slot_time}`)
+    );
+  const pendingCount = bookings.filter((b) => b.status === 'pending').length;
+  const bookingBySlot: Record<string, Booking> = Object.fromEntries(
+    activeBookings.filter((b) => b.slot_id).map((b) => [b.slot_id as string, b]));
+  const formatDate = (d: string) => d.split('-').reverse().join('.');
 
   return (
     <main className="min-h-screen bg-slate-950 text-slate-100 flex flex-col justify-between selection:bg-emerald-500 selection:text-slate-950">
@@ -1478,92 +1472,90 @@ export default function TrainerDashboard() {
                 <p className="text-slate-400 text-xs">Verwaltung freier Termine, Verfügbarkeiten und Auslastung.</p>
               </div>
             </div>
-            
-            <div className="flex items-center gap-3">
-              <button 
-                onClick={() => setIsBookingModalOpen(true)}
-                className="bg-emerald-500 hover:bg-emerald-600 text-slate-950 px-3.5 py-2 rounded-xl text-xs font-bold flex items-center gap-2 transition shadow-md shadow-emerald-500/20 cursor-pointer"
-              >
-                <CalendarIcon size={14} /> Termin eintragen
-              </button>
-            </div>
           </div>
 
           <div className="flex gap-4 border-b border-slate-800/80">
             <button
               onClick={() => setActiveCalendarTab('schedule')}
               className={`pb-3 text-xs font-bold transition border-b-2 flex items-center gap-2 cursor-pointer ${
-                activeCalendarTab === 'schedule' 
-                  ? 'border-emerald-400 text-emerald-400' 
+                activeCalendarTab === 'schedule'
+                  ? 'border-emerald-400 text-emerald-400'
                   : 'border-transparent text-slate-400 hover:text-slate-200'
               }`}
             >
-              <CalendarIcon size={14} /> Termine ({appointments.length})
+              <CalendarIcon size={14} /> Anfragen & Termine
+              {pendingCount > 0 && (
+                <span className="bg-emerald-500 text-slate-950 text-[10px] font-black px-1.5 py-0.5 rounded-full">
+                  {pendingCount} neu
+                </span>
+              )}
             </button>
           </div>
 
           {activeCalendarTab === 'schedule' && (
             <div className="space-y-4">
-              {appointments.length === 0 ? (
+              {activeBookings.length === 0 ? (
                 <div className="text-center py-10 bg-slate-950/60 rounded-2xl border border-slate-800/80">
                   <CalendarIcon className="mx-auto h-8 w-8 text-slate-600 mb-2" />
-                  <p className="text-slate-400 text-xs">Keine Termine vorhanden.</p>
+                  <p className="text-slate-400 text-xs">Noch keine Anfragen oder Termine.</p>
                 </div>
               ) : (
-                appointments.map((app) => (
-                  <div 
-                    key={app.id} 
+                activeBookings.map((b) => (
+                  <div
+                    key={b.id}
                     className="bg-slate-950/80 border border-slate-800/80 rounded-xl p-5 flex flex-col md:flex-row justify-between items-start md:items-center gap-4"
                   >
                     <div className="space-y-2">
                       <div className="flex items-center gap-3">
                         <span className={`px-2.5 py-0.5 rounded-full text-[10px] font-semibold ${
-                          app.type === 'discovery' 
-                            ? 'bg-emerald-500/10 text-emerald-400 border border-emerald-500/20' 
+                          b.offer_type === 'discovery'
+                            ? 'bg-emerald-500/10 text-emerald-400 border border-emerald-500/20'
                             : 'bg-indigo-500/10 text-indigo-400 border border-indigo-500/20'
                         }`}>
-                          {app.type === 'discovery' ? '0€ Discovery Call' : 'Kostenpflichtig'}
+                          {b.offer_type === 'discovery' ? 'Kostenlos' : 'Kostenpflichtig'}
                         </span>
                         <span className={`px-2.5 py-0.5 rounded-full text-[10px] font-medium ${
-                          app.status === 'confirmed' ? 'bg-green-500/10 text-green-400' :
-                          app.status === 'pending' ? 'bg-yellow-500/10 text-yellow-400' :
-                          'bg-red-500/10 text-red-400'
+                          b.status === 'pending' ? 'bg-yellow-500/10 text-yellow-400'
+                          : b.status === 'accepted' ? 'bg-blue-500/10 text-blue-400'
+                          : 'bg-green-500/10 text-green-400'
                         }`}>
-                          {app.status === 'confirmed' ? 'Bestätigt' : app.status === 'pending' ? 'Ausstehend' : 'Storniert'}
+                          {b.status === 'pending' ? 'Neue Anfrage'
+                            : b.status === 'accepted' ? 'Wartet auf Zahlung'
+                            : b.price > 0 ? 'Bezahlt ✓' : 'Bestätigt ✓'}
                         </span>
                       </div>
-                      <h3 className="text-sm font-bold text-white">{app.title}</h3>
+                      <h3 className="text-sm font-bold text-white">{b.offer_title}</h3>
                       <div className="flex flex-wrap items-center gap-4 text-xs text-slate-300">
                         <span className="flex items-center gap-1 text-emerald-300 font-medium">
-                          <User size={12} /> {app.clientName}
+                          <User size={12} /> {b.client_name}
                         </span>
                         <span className="flex items-center gap-1 text-slate-400">
-                          <CalendarIcon size={12} /> {app.date} ({app.time})
+                          <CalendarIcon size={12} /> {formatDate(b.slot_date)}, {b.slot_time.slice(0, 5)} Uhr
+                        </span>
+                        <span className="flex items-center gap-1 text-slate-400">
+                          <Clock size={12} /> {b.duration_minutes} Min.
                         </span>
                         <span className="flex items-center gap-1 font-semibold text-emerald-400">
-                          <DollarSign size={12} /> {app.price} €
+                          <DollarSign size={12} /> {b.price > 0 ? `${b.price} €` : '0 €'}
                         </span>
                       </div>
                     </div>
-
-                    <div className="flex items-center gap-2 self-end md:self-center">
-                      {app.status === 'pending' && (
-                        <button 
-                          onClick={() => handleUpdateAppointmentStatus(app.id, 'confirmed')}
+                    {b.status === 'pending' && (
+                      <div className="flex items-center gap-2 self-end md:self-center">
+                        <button
+                          onClick={() => handleRespond(b.id, true)}
                           className="bg-emerald-600 hover:bg-emerald-500 text-white px-3 py-1.5 rounded-lg text-xs font-medium flex items-center gap-1 transition cursor-pointer"
                         >
-                          <CheckCircle size={12} /> Bestätigen
+                          <CheckCircle size={12} /> Annehmen
                         </button>
-                      )}
-                      {app.status !== 'cancelled' && (
-                        <button 
-                          onClick={() => handleUpdateAppointmentStatus(app.id, 'cancelled')}
+                        <button
+                          onClick={() => handleRespond(b.id, false)}
                           className="bg-red-500/10 hover:bg-red-500/20 text-red-400 border border-red-500/30 px-3 py-1.5 rounded-lg text-xs font-medium flex items-center gap-1 transition cursor-pointer"
                         >
-                          <XCircle size={12} /> Absagen
+                          <XCircle size={12} /> Ablehnen
                         </button>
-                      )}
-                    </div>
+                      </div>
+                    )}
                   </div>
                 ))
               )}
@@ -1572,27 +1564,6 @@ export default function TrainerDashboard() {
 
           {/* Verfügbarkeiten & Slots Block */}
           <div className="space-y-6 pt-6 border-t border-slate-800/80">
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-4 bg-slate-950/60 p-4 rounded-xl border border-slate-800/80">
-              <div>
-                <label className="block text-xs font-semibold text-slate-400 uppercase tracking-wider mb-2">Standard-Titel für Slots</label>
-                <input
-                  type="text"
-                  value={slotTitle}
-                  onChange={(e) => setSlotTitle(e.target.value)}
-                  className="w-full bg-slate-900 border border-slate-800 rounded-xl px-4 py-3 text-sm text-white focus:outline-none focus:border-emerald-500"
-                />
-              </div>
-              <div>
-                <label className="block text-xs font-semibold text-slate-400 uppercase tracking-wider mb-2">Preis pro Slot (€)</label>
-                <input
-                  type="number"
-                  value={slotPrice}
-                  onChange={(e) => setSlotPrice(e.target.value)}
-                  className="w-full bg-slate-900 border border-slate-800 rounded-xl px-4 py-3 text-sm text-white focus:outline-none focus:border-emerald-500"
-                />
-              </div>
-            </div>
-
             <div className="bg-slate-950/60 p-6 rounded-2xl border border-slate-800/80 space-y-4">
               <div className="flex justify-between items-center">
                 <h3 className="text-sm font-bold tracking-wide text-white">
@@ -1673,6 +1644,7 @@ export default function TrainerDashboard() {
                   const isFree = slotMatch?.status === 'free';
                   const isPending = slotMatch?.status === 'pending';
                   const isBooked = slotMatch?.status === 'booked';
+                  const booking = slotMatch ? bookingBySlot[slotMatch.id] : undefined;
 
                   return (
                     <button
@@ -1698,6 +1670,11 @@ export default function TrainerDashboard() {
                           {isBooked ? 'Gebucht' : isPending ? 'Angefragt' : isFree ? 'Frei' : 'Inaktiv'}
                         </span>
                       </div>
+                      {booking && (
+                        <div className="w-full text-center text-[9px] text-slate-300 truncate" title={`${booking.client_name} · ${booking.offer_title}`}>
+                          {booking.client_name} · {booking.offer_title}
+                        </div>
+                      )}
                     </button>
                   );
                 })}
@@ -1873,146 +1850,141 @@ export default function TrainerDashboard() {
                   <span className="text-xs font-semibold text-slate-400 uppercase tracking-wider">Vorgaben (Klick zum Überschreiben des Editors):</span>
                   <div className="flex flex-wrap gap-2">
                     {defaultTemplates.map((dt: any, dIdx: number) => (
-                      <div
-                        key={dIdx}
-                        draggable
-                        onDragStart={(e) => handleDragStartTemplate(e, dt.templateName)}
+                      <button
+                        key={`default-${dIdx}`}
+                        type="button"
                         onClick={() => handleSelectDefaultTemplate(dt)}
-                        className="px-3.5 py-2 rounded-xl text-xs font-semibold cursor-grab active:cursor-grabbing transition border flex items-center gap-2 select-none bg-slate-900 text-slate-300 border-slate-800 hover:border-emerald-500/50 hover:text-white shadow-sm"
+                        className="bg-slate-900 border border-slate-800 hover:border-emerald-500/50 text-slate-300 hover:text-emerald-400 px-3 py-1.5 rounded-lg text-xs font-semibold transition cursor-pointer"
                       >
-                        <span>⚡ {dt.templateName}</span>
-                      </div>
+                        {dt.templateName}
+                      </button>
                     ))}
                   </div>
                 </div>
 
-                <div className="space-y-2 pt-3 border-t border-slate-800/80">
-                  <div className="flex flex-wrap justify-between items-center gap-3">
-                    <span className="text-xs font-semibold text-slate-400 uppercase tracking-wider">Eigene Templates:</span>
+                <div className="border-t border-slate-800/80 pt-4 space-y-4">
+                  <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-3">
+                    <span className="text-xs font-semibold text-emerald-400 uppercase tracking-wider flex items-center gap-2">
+                      <Dumbbell size={14} /> Eigene Templates (Drag & Drop fähig):
+                    </span>
                     <button
                       type="button"
                       onClick={handleAddCustomWorkoutTemplate}
-                      className="bg-emerald-500/10 hover:bg-emerald-500/20 text-emerald-400 border border-emerald-500/30 px-3 py-1.5 rounded-xl text-xs font-bold cursor-pointer transition"
+                      className="bg-emerald-500/10 hover:bg-emerald-500/20 text-emerald-400 border border-emerald-500/30 px-3 py-1.5 rounded-lg text-[11px] font-bold transition flex items-center gap-1 cursor-pointer"
                     >
-                      + Template erstellen
+                      <Plus size={12} /> Neues Template
                     </button>
                   </div>
                   <div className="flex flex-wrap gap-2">
                     {customTemplates.map((ct: any, cIdx: number) => (
                       <div
-                        key={cIdx}
+                        key={`custom-${cIdx}`}
                         draggable
                         onDragStart={(e) => handleDragStartTemplate(e, ct.templateName)}
-                        onClick={() => setActiveTemplateIndex(cIdx)}
-                        className={`px-3.5 py-2 rounded-xl text-xs font-semibold cursor-grab active:cursor-grabbing transition border flex items-center gap-2 select-none shadow-sm ${
-                          activeTemplateIndex === cIdx
-                            ? 'bg-emerald-500 text-slate-950 border-emerald-500 font-bold'
-                            : 'bg-slate-900 text-slate-300 border-slate-800 hover:border-slate-700'
+                        className={`group flex items-center bg-slate-950/80 border rounded-lg overflow-hidden transition cursor-grab active:cursor-grabbing ${
+                          cIdx === activeTemplateIndex ? 'border-emerald-500 shadow-md shadow-emerald-500/10' : 'border-slate-800'
                         }`}
                       >
-                        <span>⠿ {ct.templateName}</span>
+                        <button
+                          type="button"
+                          onClick={() => setActiveTemplateIndex(cIdx)}
+                          className={`px-3 py-1.5 text-xs font-bold transition ${
+                            cIdx === activeTemplateIndex ? 'bg-emerald-500/10 text-emerald-400' : 'text-slate-400 hover:text-white'
+                          }`}
+                        >
+                          {ct.templateName}
+                        </button>
+                        <button
+                          type="button"
+                          onClick={() => handleRemoveCustomWorkoutTemplate(cIdx)}
+                          className="px-2 py-1.5 text-red-400/50 hover:text-red-400 hover:bg-red-500/10 transition cursor-pointer"
+                          title="Template löschen"
+                        >
+                          &times;
+                        </button>
                       </div>
                     ))}
                   </div>
                 </div>
 
-                <div className="pt-4 border-t border-slate-800/80 space-y-4">
-                  <div className="flex flex-col md:flex-row gap-4 items-center justify-between">
-                    <div className="w-full md:w-1/2">
-                      <label className="block text-[10px] uppercase text-slate-400 font-semibold mb-1">
-                        Name des aktiven Templates
-                      </label>
-                      <input
-                        type="text"
-                        value={activeTemplate?.templateName || ''}
-                        onChange={(e) => handleTemplateNameChange(e.target.value)}
-                        className="w-full bg-slate-900 border border-slate-800 rounded-xl px-3.5 py-2.5 text-xs text-white focus:outline-none focus:border-emerald-500"
-                      />
-                    </div>
-                    {customTemplates.length > 1 && (
-                      <button
-                        type="button"
-                        onClick={() => handleRemoveCustomWorkoutTemplate(activeTemplateIndex)}
-                        className="bg-red-500/10 border border-red-500/30 hover:bg-red-500/20 text-red-400 px-3.5 py-2.5 rounded-xl text-xs font-semibold cursor-pointer transition self-end md:self-auto"
-                      >
-                        Template löschen
-                      </button>
-                    )}
+                <div className="bg-slate-900/50 rounded-xl border border-slate-800 p-4 sm:p-5 space-y-4 relative">
+                  <div>
+                    <label className="block text-[11px] font-bold text-slate-400 uppercase tracking-wider mb-1.5">Template-Name (erscheint im Kalender)</label>
+                    <input
+                      type="text"
+                      value={activeTemplate?.templateName || ''}
+                      onChange={(e) => handleTemplateNameChange(e.target.value)}
+                      className="w-full bg-slate-950 border border-slate-800 rounded-lg px-3 py-2 text-sm text-white focus:outline-none focus:border-emerald-500"
+                    />
                   </div>
 
-                  <div className="space-y-3 pt-2">
-                    <div className="flex justify-between items-center">
-                      <h3 className="text-xs font-bold uppercase tracking-wider text-emerald-400">
-                        Übungen für &quot;{activeTemplate?.templateName}&quot;
-                      </h3>
-                      <button
-                        type="button"
-                        onClick={handleAddExerciseToActiveTemplate}
-                        className="bg-slate-900 hover:bg-slate-800 text-slate-300 border border-slate-800 px-3 py-1.5 rounded-xl text-xs font-semibold cursor-pointer transition"
-                      >
-                        + Übung hinzufügen
-                      </button>
+                  <div className="space-y-2">
+                    <div className="hidden sm:grid grid-cols-12 gap-2 px-2 text-[10px] font-bold text-slate-500 uppercase tracking-wider">
+                      <div className="col-span-6">Übung</div>
+                      <div className="col-span-2">Sätze</div>
+                      <div className="col-span-2">Wdh.</div>
+                      <div className="col-span-2">Gew. (kg)</div>
                     </div>
-
-                    <div className="space-y-2.5">
-                      {activeTemplate?.exercises.map((item: any, index: number) => (
-                        <div key={index} className="grid grid-cols-1 md:grid-cols-12 gap-2.5 bg-slate-900/80 p-3.5 rounded-xl border border-slate-800 items-center">
-                          <div className="md:col-span-5">
-                            <label className="block text-[9px] uppercase text-slate-400 font-semibold mb-0.5">Übung</label>
-                            <select
-                              value={item.exercise}
-                              onChange={(e) => handleExerciseChangeInActiveTemplate(index, 'exercise', e.target.value)}
-                              className="w-full bg-slate-950 border border-slate-800 rounded-lg px-3 py-2 text-xs text-white focus:outline-none focus:border-emerald-500"
-                            >
-                              {EXERCISE_OPTIONS.map((ex: string) => (
-                                <option key={ex} value={ex}>{ex}</option>
-                              ))}
-                            </select>
-                          </div>
-                          <div className="md:col-span-2">
-                            <label className="block text-[9px] uppercase text-slate-400 font-semibold mb-0.5">Sets</label>
-                            <input
-                              type="text"
-                              value={item.sets}
-                              onChange={(e) => handleExerciseChangeInActiveTemplate(index, 'sets', e.target.value)}
-                              className="w-full bg-slate-950 border border-slate-800 rounded-lg px-3 py-2 text-xs text-white focus:outline-none focus:border-emerald-500"
-                            />
-                          </div>
-                          <div className="md:col-span-2">
-                            <label className="block text-[9px] uppercase text-slate-400 font-semibold mb-0.5">Reps</label>
-                            <input
-                              type="text"
-                              value={item.reps}
-                              onChange={(e) => handleExerciseChangeInActiveTemplate(index, 'reps', e.target.value)}
-                              className="w-full bg-slate-950 border border-slate-800 rounded-lg px-3 py-2 text-xs text-white focus:outline-none focus:border-emerald-500"
-                            />
-                          </div>
-                          <div className="md:col-span-2">
-                            <label className="block text-[9px] uppercase text-slate-400 font-semibold mb-0.5">Gewicht</label>
-                            <div className="relative flex items-center">
-                              <input
-                                type="text"
-                                value={item.weight}
-                                onChange={(e) => handleExerciseChangeInActiveTemplate(index, 'weight', e.target.value)}
-                                className="w-full bg-slate-950 border border-slate-800 rounded-lg pl-3 pr-7 py-2 text-xs text-white focus:outline-none focus:border-emerald-500"
-                              />
-                              <span className="absolute right-2 text-xs text-slate-400 font-medium pointer-events-none">kg</span>
-                            </div>
-                          </div>
-                          <div className="md:col-span-1 flex justify-end items-end pt-2 md:pt-0">
-                            {activeTemplate.exercises.length > 1 && (
-                              <button
-                                type="button"
-                                onClick={() => handleRemoveExerciseFromActiveTemplate(index)}
-                                className="bg-red-500/10 hover:bg-red-500/20 text-red-400 border border-red-500/30 p-2 rounded-lg text-xs cursor-pointer transition w-full text-center font-bold"
-                              >
-                                &times;
-                              </button>
-                            )}
-                          </div>
+                    {activeTemplate?.exercises.map((ex: any, exIdx: number) => (
+                      <div key={exIdx} className="grid grid-cols-1 sm:grid-cols-12 gap-2 items-center bg-slate-950/50 p-2 sm:p-1 rounded-lg sm:bg-transparent">
+                        <div className="sm:col-span-6 relative">
+                          <label className="sm:hidden block text-[9px] font-bold text-slate-500 uppercase mb-1">Übung</label>
+                          <select
+                            value={ex.exercise}
+                            onChange={(e) => handleExerciseChangeInActiveTemplate(exIdx, 'exercise', e.target.value)}
+                            className="w-full bg-slate-900 border border-slate-800 rounded-md px-2 py-1.5 text-xs text-white focus:outline-none focus:border-emerald-500 appearance-none"
+                          >
+                            <option value="">Übung wählen...</option>
+                            {EXERCISE_OPTIONS.map(opt => <option key={opt} value={opt}>{opt}</option>)}
+                          </select>
                         </div>
-                      ))}
-                    </div>
+                        <div className="sm:col-span-2 flex items-center gap-2 sm:block">
+                          <label className="sm:hidden w-16 text-[9px] font-bold text-slate-500 uppercase">Sätze</label>
+                          <input
+                            type="text"
+                            value={ex.sets}
+                            onChange={(e) => handleExerciseChangeInActiveTemplate(exIdx, 'sets', e.target.value)}
+                            placeholder="Sätze"
+                            className="w-full bg-slate-900 border border-slate-800 rounded-md px-2 py-1.5 text-xs text-center text-white focus:outline-none focus:border-emerald-500"
+                          />
+                        </div>
+                        <div className="sm:col-span-2 flex items-center gap-2 sm:block">
+                          <label className="sm:hidden w-16 text-[9px] font-bold text-slate-500 uppercase">Wdh.</label>
+                          <input
+                            type="text"
+                            value={ex.reps}
+                            onChange={(e) => handleExerciseChangeInActiveTemplate(exIdx, 'reps', e.target.value)}
+                            placeholder="Wdh."
+                            className="w-full bg-slate-900 border border-slate-800 rounded-md px-2 py-1.5 text-xs text-center text-white focus:outline-none focus:border-emerald-500"
+                          />
+                        </div>
+                        <div className="sm:col-span-2 flex items-center gap-2">
+                          <label className="sm:hidden w-16 text-[9px] font-bold text-slate-500 uppercase">Gewicht</label>
+                          <input
+                            type="text"
+                            value={ex.weight}
+                            onChange={(e) => handleExerciseChangeInActiveTemplate(exIdx, 'weight', e.target.value)}
+                            placeholder="kg"
+                            className="w-full bg-slate-900 border border-slate-800 rounded-md px-2 py-1.5 text-xs text-center text-emerald-400 font-bold focus:outline-none focus:border-emerald-500"
+                          />
+                          <button
+                            type="button"
+                            onClick={() => handleRemoveExerciseFromActiveTemplate(exIdx)}
+                            className="sm:absolute sm:-right-6 text-slate-500 hover:text-red-400 p-1 transition cursor-pointer"
+                            title="Übung entfernen"
+                          >
+                            <Trash2 size={14} />
+                          </button>
+                        </div>
+                      </div>
+                    ))}
+                    <button
+                      type="button"
+                      onClick={handleAddExerciseToActiveTemplate}
+                      className="w-full bg-slate-900/50 hover:bg-slate-900 border border-slate-800 border-dashed text-slate-400 hover:text-emerald-400 py-2 rounded-lg text-xs font-bold transition flex items-center justify-center gap-1.5 cursor-pointer mt-2"
+                    >
+                      <Plus size={14} /> Übung hinzufügen
+                    </button>
                   </div>
                 </div>
               </div>
@@ -2020,32 +1992,32 @@ export default function TrainerDashboard() {
               <button
                 type="submit"
                 disabled={workoutSaving}
-                className="w-full bg-emerald-500 hover:bg-emerald-600 text-slate-950 font-bold py-3.5 rounded-xl text-sm transition shadow-lg shadow-emerald-500/20 cursor-pointer"
+                className="w-full bg-emerald-500 hover:bg-emerald-600 text-slate-950 font-bold py-3.5 rounded-xl text-sm transition shadow-lg shadow-emerald-500/20 cursor-pointer flex items-center justify-center gap-2"
               >
-                {workoutSaving ? 'Übertrage Monatsplan...' : 'Gesamten Monats- & Zeitraumplan übertragen'}
+                {workoutSaving ? 'Speichere...' : 'Monatsplan an Kunden senden'}
+                {!workoutSaving && <CheckCircle size={16} />}
               </button>
             </form>
           </div>
 
           {/* Ernährungsplaner */}
-          <div className="bg-slate-900/60 backdrop-blur-md border border-slate-800/80 rounded-2xl p-6 sm:p-8 shadow-xl space-y-6 relative overflow-visible">
+          <div className="bg-slate-900/60 backdrop-blur-md border border-slate-800/80 rounded-2xl p-6 sm:p-8 shadow-xl space-y-6">
             <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-4 border-b border-slate-800/80 pb-4">
               <div className="flex items-center gap-3">
                 <div className="p-2.5 bg-emerald-500/10 text-emerald-400 rounded-xl border border-emerald-500/20">
                   <Utensils size={20} />
                 </div>
                 <div>
-                  <h2 className="text-lg font-bold text-white tracking-tight">Ernährungsplaner (Mifflin-St. Jeor Makro-Berechnung)</h2>
-                  <p className="text-slate-400 text-xs">Erstelle Tages-Templates, ziehe sie in den Kalender und übertrage den Monatsplan.</p>
+                  <h2 className="text-lg font-bold text-white tracking-tight">Ernährungsplaner</h2>
+                  <p className="text-slate-400 text-xs">Makros tracken, Templates erstellen und per Drag & Drop planen.</p>
                 </div>
               </div>
-              
               <button
                 type="button"
                 onClick={() => setIsFoodModalOpen(true)}
-                className="bg-slate-800 hover:bg-slate-700 text-emerald-400 border border-emerald-500/30 px-3.5 py-2 rounded-xl text-xs font-semibold flex items-center gap-2 transition cursor-pointer"
+                className="bg-slate-800 hover:bg-slate-700 text-white px-3.5 py-2 rounded-xl text-xs font-semibold flex items-center gap-2 border border-slate-700 transition cursor-pointer shadow-sm"
               >
-                <Plus size={14} /> Lebensmittel zur DB hinzufügen
+                <Plus size={14} /> Neues Lebensmittel in DB
               </button>
             </div>
 
@@ -2067,23 +2039,21 @@ export default function TrainerDashboard() {
                   >
                     <option value="">Kunde wählen...</option>
                     {clients.map((c: any) => (
-                      <option key={c.id} value={c.id}>{c.name || c.email}</option>
+                      <option key={`nut-${c.id}`} value={c.id}>{c.name || c.email}</option>
                     ))}
                   </select>
                 </div>
-
                 <div>
                   <label className="block text-xs font-semibold text-slate-400 uppercase tracking-wider mb-2">Gesamt-Titel des Plans</label>
                   <input
                     type="text"
-                    placeholder="z.B. Definitionsphase Ernährungsplan"
+                    placeholder="z.B. 4-Wochen Definitionsphase"
                     value={nutritionMainTitle}
                     onChange={(e) => setNutritionMainTitle(e.target.value)}
                     className="w-full bg-slate-950/80 border border-slate-800 rounded-xl px-4 py-3 text-sm text-white focus:outline-none focus:border-emerald-500 transition shadow-inner"
                     required
                   />
                 </div>
-
                 <div>
                   <label className="block text-xs font-semibold text-slate-400 uppercase tracking-wider mb-2">Zeitraum / Dauer</label>
                   <select
@@ -2099,7 +2069,7 @@ export default function TrainerDashboard() {
                 </div>
               </div>
 
-              {/* Kalender Grid für Ernährung */}
+              {/* Kalender Grid (Nutrition) */}
               <div className="bg-slate-950/60 p-5 sm:p-6 rounded-2xl border border-slate-800/80 space-y-4">
                 <div className="flex justify-between items-center">
                   <div>
@@ -2125,27 +2095,20 @@ export default function TrainerDashboard() {
                     </button>
                   </div>
                 </div>
-
                 <div className="grid grid-cols-7 gap-1 text-center font-bold text-[11px] text-slate-500 uppercase tracking-wider py-1 border-b border-slate-800/80">
                   <div>Mo</div><div>Di</div><div>Mi</div><div>Do</div><div>Fr</div><div>Sa</div><div>So</div>
                 </div>
-
                 <div className="grid grid-cols-7 gap-2">
                   {Array.from({ length: getFirstDayOfMonth(currentYear, currentMonth) }).map((_, i) => (
                     <div key={`n-empty-${i}`} className="h-20 bg-transparent" />
                   ))}
-
                   {Array.from({ length: getDaysInMonth(currentYear, currentMonth) }).map((_, i) => {
                     const dayNum = i + 1;
-                    const formattedDay = String(dayNum).padStart(2, '0');
-                    const formattedMonthNum = String(currentMonth + 1).padStart(2, '0');
-                    const dateStr = `${currentYear}-${formattedMonthNum}-${formattedDay}`;
-
+                    const dateStr = `${currentYear}-${String(currentMonth + 1).padStart(2, '0')}-${String(dayNum).padStart(2, '0')}`;
                     const assignedTemplate = nutritionScheduleMap[dateStr];
-
                     return (
                       <div
-                        key={dateStr}
+                        key={`n-${dateStr}`}
                         onDragOver={handleDragOver}
                         onDrop={(e) => handleDropOnNutritionDate(e, dateStr)}
                         className={`h-20 rounded-xl p-2 text-xs transition flex flex-col justify-between border text-left ${
@@ -2160,7 +2123,6 @@ export default function TrainerDashboard() {
                             <button
                               type="button"
                               onClick={(e) => handleRemoveNutritionTemplateFromDateDirect(dateStr, e)}
-                              title="Template entfernen"
                               className="bg-red-500/20 hover:bg-red-500 text-red-300 hover:text-white w-4 h-4 rounded-full flex items-center justify-center text-[10px] font-bold transition cursor-pointer"
                             >
                               &times;
@@ -2169,7 +2131,7 @@ export default function TrainerDashboard() {
                         </div>
                         <div className="overflow-hidden">
                           {assignedTemplate ? (
-                            <span className="block text-[9px] font-semibold text-emerald-300 bg-emerald-500/20 px-1.5 py-0.5 rounded truncate">
+                            <span className="block text-[9px] font-semibold text-emerald-300 bg-emerald-500/20 px-1.5 py-0.5 rounded truncate" title={assignedTemplate}>
                               {assignedTemplate}
                             </span>
                           ) : (
@@ -2182,295 +2144,243 @@ export default function TrainerDashboard() {
                 </div>
               </div>
 
-              {/* Ernährungs-Templates Leiste & Editor */}
+              {/* Templates Leiste & Editor (Nutrition) */}
               <div className="bg-slate-950/60 p-5 rounded-2xl border border-slate-800/80 space-y-4">
                 <div className="space-y-2">
                   <span className="text-xs font-semibold text-slate-400 uppercase tracking-wider">Vorgaben (Klick zum Überschreiben des Editors):</span>
                   <div className="flex flex-wrap gap-2">
                     {defaultNutritionTemplates.map((dt: any, dIdx: number) => (
-                      <div
-                        key={dIdx}
-                        draggable
-                        onDragStart={(e) => handleDragStartNutritionTemplate(e, dt.templateName)}
+                      <button
+                        key={`ndef-${dIdx}`}
+                        type="button"
                         onClick={() => handleSelectDefaultNutritionTemplate(dt)}
-                        className="px-3.5 py-2 rounded-xl text-xs font-semibold cursor-grab active:cursor-grabbing transition border flex items-center gap-2 select-none bg-slate-900 text-slate-300 border-slate-800 hover:border-emerald-500/50 hover:text-white shadow-sm"
+                        className="bg-slate-900 border border-slate-800 hover:border-emerald-500/50 text-slate-300 hover:text-emerald-400 px-3 py-1.5 rounded-lg text-xs font-semibold transition cursor-pointer"
                       >
-                        <span>⚡ {dt.templateName}</span>
-                      </div>
+                        {dt.templateName}
+                      </button>
                     ))}
                   </div>
                 </div>
 
-                <div className="space-y-2 pt-3 border-t border-slate-800/80">
-                  <div className="flex flex-wrap justify-between items-center gap-3">
-                    <span className="text-xs font-semibold text-slate-400 uppercase tracking-wider">Eigene Ernährungs-Templates:</span>
+                <div className="border-t border-slate-800/80 pt-4 space-y-4">
+                  <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-3">
+                    <span className="text-xs font-semibold text-emerald-400 uppercase tracking-wider flex items-center gap-2">
+                      <Utensils size={14} /> Eigene Ernährungs-Tage (Drag & Drop fähig):
+                    </span>
                     <button
                       type="button"
                       onClick={handleAddCustomNutritionTemplate}
-                      className="bg-emerald-500/10 hover:bg-emerald-500/20 text-emerald-400 border border-emerald-500/30 px-3 py-1.5 rounded-xl text-xs font-bold cursor-pointer transition"
+                      className="bg-emerald-500/10 hover:bg-emerald-500/20 text-emerald-400 border border-emerald-500/30 px-3 py-1.5 rounded-lg text-[11px] font-bold transition flex items-center gap-1 cursor-pointer"
                     >
-                      + Template erstellen
+                      <Plus size={12} /> Neuer Tag
                     </button>
                   </div>
                   <div className="flex flex-wrap gap-2">
                     {customNutritionTemplates.map((ct: any, cIdx: number) => (
                       <div
-                        key={cIdx}
+                        key={`ncustom-${cIdx}`}
                         draggable
                         onDragStart={(e) => handleDragStartNutritionTemplate(e, ct.templateName)}
-                        onClick={() => setActiveNutritionTemplateIndex(cIdx)}
-                        className={`px-3.5 py-2 rounded-xl text-xs font-semibold cursor-grab active:cursor-grabbing transition border flex items-center gap-2 select-none shadow-sm ${
-                          activeNutritionTemplateIndex === cIdx
-                            ? 'bg-emerald-500 text-slate-950 border-emerald-500 font-bold'
-                            : 'bg-slate-900 text-slate-300 border-slate-800 hover:border-slate-700'
+                        className={`group flex items-center bg-slate-950/80 border rounded-lg overflow-hidden transition cursor-grab active:cursor-grabbing ${
+                          cIdx === activeNutritionTemplateIndex ? 'border-emerald-500 shadow-md shadow-emerald-500/10' : 'border-slate-800'
                         }`}
                       >
-                        <span>🥗 {ct.templateName}</span>
+                        <button
+                          type="button"
+                          onClick={() => setActiveNutritionTemplateIndex(cIdx)}
+                          className={`px-3 py-1.5 text-xs font-bold transition ${
+                            cIdx === activeNutritionTemplateIndex ? 'bg-emerald-500/10 text-emerald-400' : 'text-slate-400 hover:text-white'
+                          }`}
+                        >
+                          {ct.templateName}
+                        </button>
+                        <button
+                          type="button"
+                          onClick={() => handleRemoveCustomNutritionTemplate(cIdx)}
+                          className="px-2 py-1.5 text-red-400/50 hover:text-red-400 hover:bg-red-500/10 transition cursor-pointer"
+                          title="Tag löschen"
+                        >
+                          &times;
+                        </button>
                       </div>
                     ))}
                   </div>
                 </div>
 
-                <div className="pt-4 border-t border-slate-800/80 space-y-4">
-                  <div className="flex flex-col md:flex-row gap-4 items-center justify-between">
-                    <div className="w-full md:w-1/2">
-                      <label className="block text-[10px] uppercase text-slate-400 font-semibold mb-1">
-                        Name des aktiven Templates
-                      </label>
-                      <input
-                        type="text"
-                        value={activeNutritionTemplate?.templateName || ''}
-                        onChange={(e) => handleNutritionTemplateNameChange(e.target.value)}
-                        className="w-full bg-slate-900 border border-slate-800 rounded-xl px-3.5 py-2.5 text-xs text-white focus:outline-none focus:border-emerald-500"
-                      />
-                    </div>
-                    {customNutritionTemplates.length > 1 && (
-                      <button
-                        type="button"
-                        onClick={() => handleRemoveCustomNutritionTemplate(activeNutritionTemplateIndex)}
-                        className="bg-red-500/10 border border-red-500/30 hover:bg-red-500/20 text-red-400 px-3.5 py-2.5 rounded-xl text-xs font-semibold cursor-pointer transition self-end md:self-auto"
-                      >
-                        Template löschen
-                      </button>
-                    )}
+                <div className="bg-slate-900/50 rounded-xl border border-slate-800 p-4 sm:p-5 space-y-6 relative">
+                  <div>
+                    <label className="block text-[11px] font-bold text-slate-400 uppercase tracking-wider mb-1.5">Template-Name (erscheint im Kalender)</label>
+                    <input
+                      type="text"
+                      value={activeNutritionTemplate?.templateName || ''}
+                      onChange={(e) => handleNutritionTemplateNameChange(e.target.value)}
+                      className="w-full bg-slate-950 border border-slate-800 rounded-lg px-3 py-2 text-sm text-white focus:outline-none focus:border-emerald-500"
+                    />
                   </div>
 
-                  {/* Tägliche Makro- & Kalorienziele für das aktive Template */}
-                  <div className="bg-slate-900/60 p-4 rounded-xl border border-slate-800 space-y-3">
-                    <h3 className="text-xs font-bold uppercase tracking-wider text-emerald-400">Tägliche Zielvorgaben für &quot;{activeNutritionTemplate?.templateName}&quot;</h3>
-                    <div className="grid grid-cols-2 sm:grid-cols-5 gap-3">
-                      <div>
-                        <label className="block text-[10px] uppercase text-slate-400 font-semibold mb-1">Ziel-kcal</label>
-                        <input
-                          type="text"
-                          value={activeNutritionTemplate?.targetCalories || ''}
-                          onChange={(e) => handleNutritionMacroChange('targetCalories', e.target.value)}
-                          className="w-full bg-slate-950 border border-slate-800 rounded-lg px-3 py-2 text-xs text-white focus:outline-none focus:border-emerald-500"
-                        />
+                  {/* Tagesziele & Makros Header */}
+                  <div className="grid grid-cols-2 sm:grid-cols-5 gap-3 bg-slate-950/80 p-4 rounded-xl border border-slate-800">
+                    <div>
+                      <span className="block text-[9px] font-bold text-slate-500 uppercase">Kcal Ziel</span>
+                      <div className="flex items-center gap-1">
+                        <input type="text" value={activeNutritionTemplate?.targetCalories || ''} onChange={(e) => handleNutritionMacroChange('targetCalories', e.target.value)} className="w-full bg-transparent border-b border-slate-700 text-emerald-400 font-black text-sm focus:outline-none focus:border-emerald-500" />
                       </div>
-                      <div>
-                        <label className="block text-[10px] uppercase text-slate-400 font-semibold mb-1">Protein (g)</label>
-                        <input
-                          type="text"
-                          value={activeNutritionTemplate?.targetProtein || ''}
-                          onChange={(e) => handleNutritionMacroChange('targetProtein', e.target.value)}
-                          className="w-full bg-slate-950 border border-slate-800 rounded-lg px-3 py-2 text-xs text-white focus:outline-none focus:border-emerald-500"
-                        />
+                    </div>
+                    <div>
+                      <span className="block text-[9px] font-bold text-slate-500 uppercase">Protein (g)</span>
+                      <div className="flex items-center gap-1">
+                        <input type="text" value={activeNutritionTemplate?.targetProtein || ''} onChange={(e) => handleNutritionMacroChange('targetProtein', e.target.value)} className="w-full bg-transparent border-b border-slate-700 text-white font-bold text-sm focus:outline-none focus:border-slate-500" />
                       </div>
-                      <div>
-                        <label className="block text-[10px] uppercase text-slate-400 font-semibold mb-1">Kohlenh. (g)</label>
-                        <input
-                          type="text"
-                          value={activeNutritionTemplate?.targetCarbs || ''}
-                          onChange={(e) => handleNutritionMacroChange('targetCarbs', e.target.value)}
-                          className="w-full bg-slate-950 border border-slate-800 rounded-lg px-3 py-2 text-xs text-white focus:outline-none focus:border-emerald-500"
-                        />
+                    </div>
+                    <div>
+                      <span className="block text-[9px] font-bold text-slate-500 uppercase">Kohlenhydrate (g)</span>
+                      <div className="flex items-center gap-1">
+                        <input type="text" value={activeNutritionTemplate?.targetCarbs || ''} onChange={(e) => handleNutritionMacroChange('targetCarbs', e.target.value)} className="w-full bg-transparent border-b border-slate-700 text-white font-bold text-sm focus:outline-none focus:border-slate-500" />
                       </div>
-                      <div>
-                        <label className="block text-[10px] uppercase text-slate-400 font-semibold mb-1">Fett (g)</label>
-                        <input
-                          type="text"
-                          value={activeNutritionTemplate?.targetFat || ''}
-                          onChange={(e) => handleNutritionMacroChange('targetFat', e.target.value)}
-                          className="w-full bg-slate-950 border border-slate-800 rounded-lg px-3 py-2 text-xs text-white focus:outline-none focus:border-emerald-500"
-                        />
+                    </div>
+                    <div>
+                      <span className="block text-[9px] font-bold text-slate-500 uppercase">Fett (g)</span>
+                      <div className="flex items-center gap-1">
+                        <input type="text" value={activeNutritionTemplate?.targetFat || ''} onChange={(e) => handleNutritionMacroChange('targetFat', e.target.value)} className="w-full bg-transparent border-b border-slate-700 text-white font-bold text-sm focus:outline-none focus:border-slate-500" />
                       </div>
-                      <div>
-                        <label className="block text-[10px] uppercase text-slate-400 font-semibold mb-1">Wasser (L)</label>
-                        <input
-                          type="text"
-                          value={activeNutritionTemplate?.waterIntake || ''}
-                          onChange={(e) => handleNutritionMacroChange('waterIntake', e.target.value)}
-                          className="w-full bg-slate-950 border border-slate-800 rounded-lg px-3 py-2 text-xs text-white focus:outline-none focus:border-emerald-500"
-                        />
+                    </div>
+                    <div>
+                      <span className="block text-[9px] font-bold text-slate-500 uppercase">Wasser (L)</span>
+                      <div className="flex items-center gap-1">
+                        <input type="text" value={activeNutritionTemplate?.waterIntake || ''} onChange={(e) => handleNutritionMacroChange('waterIntake', e.target.value)} className="w-full bg-transparent border-b border-slate-700 text-blue-400 font-bold text-sm focus:outline-none focus:border-blue-500" />
                       </div>
                     </div>
                   </div>
 
-                  {/* Mahlzeiten im aktiven Template */}
-                  <div className="space-y-4 pt-2">
-                    <div className="flex justify-between items-center">
-                      <h3 className="text-xs font-bold uppercase tracking-wider text-emerald-400">
-                        Mahlzeiten für &quot;{activeNutritionTemplate?.templateName}&quot;
-                      </h3>
-                      <button
-                        type="button"
-                        onClick={handleAddMealRow}
-                        className="bg-slate-900 hover:bg-slate-800 text-slate-300 border border-slate-800 px-3 py-1.5 rounded-xl text-xs font-semibold cursor-pointer transition"
-                      >
-                        + Mahlzeit hinzufügen
-                      </button>
-                    </div>
+                  {/* Mahlzeiten & Lebensmittel */}
+                  <div className="space-y-4">
+                    <h4 className="text-xs font-bold text-slate-300 uppercase tracking-wider">Mahlzeiten</h4>
+                    {activeNutritionTemplate?.meals.map((meal: any, mIdx: number) => {
+                      const mealTotalKcal = meal.items.reduce((sum: number, item: any) => sum + (parseFloat(item.calories) || 0), 0);
+                      const mealTotalP = meal.items.reduce((sum: number, item: any) => sum + (parseFloat(item.protein) || 0), 0);
+                      const mealTotalC = meal.items.reduce((sum: number, item: any) => sum + (parseFloat(item.carbs) || 0), 0);
+                      const mealTotalF = meal.items.reduce((sum: number, item: any) => sum + (parseFloat(item.fat) || 0), 0);
 
-                    <div className="space-y-4">
-                      {activeNutritionTemplate?.meals.map((meal: any, mealIndex: number) => (
-                        <div key={mealIndex} className="bg-slate-900/80 border border-slate-800 rounded-2xl p-4 sm:p-5 space-y-4 overflow-visible">
-                          <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-3 pb-3 border-b border-slate-800/80">
-                            <div className="flex items-center gap-3 w-full sm:w-auto">
-                              <div className="w-24">
-                                <label className="block text-[9px] uppercase text-slate-400 font-semibold mb-1">Uhrzeit</label>
-                                <input
-                                  type="text"
-                                  value={meal.time}
-                                  onChange={(e) => handleMealHeaderChange(mealIndex, 'time', e.target.value)}
-                                  className="w-full bg-slate-950 border border-slate-800 rounded-lg px-2.5 py-1.5 text-xs text-white focus:outline-none focus:border-emerald-500"
-                                />
-                              </div>
-                              <div className="flex-1 sm:w-48">
-                                <label className="block text-[9px] uppercase text-slate-400 font-semibold mb-1">Mahlzeiten-Titel</label>
-                                <input
-                                  type="text"
-                                  value={meal.title}
-                                  onChange={(e) => handleMealHeaderChange(mealIndex, 'title', e.target.value)}
-                                  className="w-full bg-slate-950 border border-slate-800 rounded-lg px-2.5 py-1.5 text-xs text-white focus:outline-none focus:border-emerald-500 font-bold"
-                                />
-                              </div>
+                      return (
+                        <div key={`m-${mIdx}`} className="bg-slate-950 border border-slate-800 rounded-xl overflow-hidden">
+                          {/* Meal Header */}
+                          <div className="bg-slate-900/80 px-4 py-3 flex flex-wrap gap-3 justify-between items-center border-b border-slate-800">
+                            <div className="flex items-center gap-3 flex-1">
+                              <input 
+                                type="time" 
+                                value={meal.time} 
+                                onChange={(e) => handleMealHeaderChange(mIdx, 'time', e.target.value)}
+                                className="bg-slate-950 border border-slate-700 rounded text-xs px-2 py-1 text-slate-300 focus:outline-none focus:border-emerald-500"
+                              />
+                              <input 
+                                type="text" 
+                                value={meal.title} 
+                                onChange={(e) => handleMealHeaderChange(mIdx, 'title', e.target.value)}
+                                placeholder="Mahlzeit Name..."
+                                className="bg-transparent font-bold text-sm text-emerald-400 focus:outline-none placeholder:text-slate-600 flex-1"
+                              />
                             </div>
-
-                            <div className="flex items-center gap-2 self-end sm:self-auto">
-                              <button
-                                type="button"
-                                onClick={() => handleAddFoodItemToMeal(mealIndex)}
-                                className="bg-emerald-500/10 hover:bg-emerald-500/20 text-emerald-400 border border-emerald-500/30 px-3 py-1.5 rounded-lg text-xs font-semibold transition cursor-pointer"
-                              >
-                                + Lebensmittel hinzufügen
-                              </button>
-                              {activeNutritionTemplate.meals.length > 1 && (
-                                <button
-                                  type="button"
-                                  onClick={() => handleRemoveMealRow(mealIndex)}
-                                  className="bg-red-500/10 hover:bg-red-500/20 text-red-400 border border-red-500/30 px-3 py-1.5 rounded-lg text-xs font-semibold transition cursor-pointer"
-                                >
-                                  Mahlzeit löschen
-                                </button>
-                              )}
+                            <div className="flex items-center gap-4 text-[10px] font-bold text-slate-400 bg-slate-950 px-3 py-1.5 rounded-lg border border-slate-800">
+                              <span className="text-emerald-400">{mealTotalKcal} kcal</span>
+                              <span>P: {mealTotalP.toFixed(1)}g</span>
+                              <span>C: {mealTotalC.toFixed(1)}g</span>
+                              <span>F: {mealTotalF.toFixed(1)}g</span>
+                              <button type="button" onClick={() => handleRemoveMealRow(mIdx)} className="ml-2 text-slate-500 hover:text-red-400 transition" title="Mahlzeit löschen"><Trash2 size={12} /></button>
                             </div>
                           </div>
 
-                          <div className="space-y-3 overflow-visible">
-                            {meal.items.map((item: any, itemIndex: number) => {
-                              const searchTerm = (item.foodSearchInput || '').toLowerCase();
-                              const filteredFoods = foodDatabase
-                                .slice()
-                                .sort((a, b) => a.name.localeCompare(b.name, 'de'))
-                                .filter(f => f.name.toLowerCase().includes(searchTerm));
+                          {/* Meal Items */}
+                          <div className="p-3 space-y-2">
+                            <div className="hidden sm:grid grid-cols-12 gap-2 px-2 text-[9px] font-bold text-slate-500 uppercase tracking-wider">
+                              <div className="col-span-5">Lebensmittel-Suche</div>
+                              <div className="col-span-2">Menge (g)</div>
+                              <div className="col-span-1 text-right">Kcal</div>
+                              <div className="col-span-1 text-right">P</div>
+                              <div className="col-span-1 text-right">C</div>
+                              <div className="col-span-1 text-right">F</div>
+                              <div className="col-span-1 text-center">Aktion</div>
+                            </div>
+
+                            {meal.items.map((item: any, iIdx: number) => {
+                              const searchVal = item.foodSearchInput?.toLowerCase() || '';
+                              const showDropdown = searchVal.length > 0 && !item.foodId;
+                              const filteredFoods = showDropdown ? foodDatabase.filter((f: any) => f.name.toLowerCase().includes(searchVal)) : [];
 
                               return (
-                                <div key={itemIndex} className="grid grid-cols-1 md:grid-cols-12 gap-2.5 bg-slate-950/90 p-3 rounded-xl border border-slate-800 items-center relative overflow-visible">
-                                  <div className="md:col-span-4 space-y-1 relative">
-                                    <label className="block text-[9px] uppercase text-slate-400 font-semibold mb-0.5">Lebensmittel-Suche</label>
+                                <div key={`item-${mIdx}-${iIdx}`} className="grid grid-cols-1 sm:grid-cols-12 gap-2 items-center bg-slate-900/50 p-2 rounded-lg relative">
+                                  <div className="sm:col-span-5 relative">
+                                    <label className="sm:hidden block text-[9px] font-bold text-slate-500 uppercase mb-1">Lebensmittel</label>
                                     <input
                                       type="text"
-                                      placeholder="z.B. Hafer, Hähnchen..."
                                       value={item.foodSearchInput || ''}
-                                      onChange={(e) => handleFoodSearchInputChange(mealIndex, itemIndex, e.target.value)}
-                                      className="w-full bg-slate-900 border border-slate-800 rounded-lg px-3 py-2 text-xs text-emerald-400 font-bold focus:outline-none focus:border-emerald-500"
+                                      onChange={(e) => handleFoodSearchInputChange(mIdx, iIdx, e.target.value)}
+                                      placeholder="Suchen... (z.B. Haferflocken)"
+                                      className="w-full bg-slate-950 border border-slate-800 rounded-md px-2 py-1.5 text-xs text-white focus:outline-none focus:border-emerald-500"
                                     />
-
-                                    {item.foodSearchInput && filteredFoods.length > 0 && (
-                                      <div className="absolute left-0 right-0 top-full mt-1 bg-slate-950 border border-emerald-500/50 rounded-xl shadow-2xl z-[9999] max-h-56 overflow-y-auto">
+                                    {showDropdown && filteredFoods.length > 0 && (
+                                      <div className="absolute z-10 w-full mt-1 bg-slate-800 border border-slate-700 rounded-md shadow-xl max-h-40 overflow-y-auto">
                                         {filteredFoods.map((f: any) => (
-                                          <div
+                                          <button
                                             key={f.id}
-                                            onClick={() => handleSelectFoodItem(mealIndex, itemIndex, f)}
-                                            className="px-3.5 py-2.5 text-xs text-slate-200 hover:bg-emerald-500/20 hover:text-emerald-300 cursor-pointer border-b border-slate-800/80 flex justify-between items-center transition"
+                                            type="button"
+                                            onClick={() => handleSelectFoodItem(mIdx, iIdx, f)}
+                                            className="w-full text-left px-3 py-2 text-xs hover:bg-emerald-500/20 hover:text-emerald-300 border-b border-slate-700/50 last:border-0"
                                           >
-                                            <span className="font-semibold">{f.name}</span>
-                                            <span className="text-emerald-400 text-[10px] bg-emerald-500/10 px-2 py-0.5 rounded">{f.kcal} kcal / 100g</span>
-                                          </div>
+                                            {f.name} <span className="text-[10px] text-slate-400">({f.kcal} kcal/100g)</span>
+                                          </button>
                                         ))}
                                       </div>
                                     )}
                                   </div>
-
-                                  <div className="md:col-span-2 space-y-1">
-                                    <label className="block text-[9px] uppercase text-slate-400 font-semibold mb-0.5">Gramm</label>
+                                  <div className="sm:col-span-2 flex items-center gap-2">
+                                    <label className="sm:hidden w-16 text-[9px] font-bold text-slate-500 uppercase">Menge (g)</label>
                                     <input
                                       type="number"
                                       value={item.grams}
-                                      onChange={(e) => handleGramsChange(mealIndex, itemIndex, e.target.value)}
-                                      className="w-full bg-slate-900 border border-slate-800 rounded-lg px-2.5 py-2 text-xs text-white focus:outline-none focus:border-emerald-500 text-center font-bold"
+                                      onChange={(e) => handleGramsChange(mIdx, iIdx, e.target.value)}
+                                      className="w-full bg-slate-950 border border-slate-800 rounded-md px-2 py-1.5 text-xs text-center text-white focus:outline-none focus:border-emerald-500"
                                     />
                                   </div>
-
-                                  <div className="md:col-span-1">
-                                    <label className="block text-[9px] uppercase text-slate-400 font-semibold mb-0.5">kcal</label>
-                                    <input
-                                      type="text"
-                                      readOnly
-                                      value={item.calories}
-                                      className="w-full bg-slate-900 border border-slate-800 rounded-lg px-2 py-2 text-xs text-emerald-400 font-bold text-center"
-                                    />
+                                  <div className="sm:col-span-1 flex justify-between sm:block text-right">
+                                    <span className="sm:hidden text-[9px] font-bold text-slate-500 uppercase">Kcal</span>
+                                    <span className="text-xs font-bold text-emerald-400">{item.calories || 0}</span>
                                   </div>
-
-                                  <div className="md:col-span-1">
-                                    <label className="block text-[9px] uppercase text-slate-400 font-semibold mb-0.5">Protein</label>
-                                    <input
-                                      type="text"
-                                      readOnly
-                                      value={item.protein}
-                                      className="w-full bg-slate-900 border border-slate-800 rounded-lg px-2 py-2 text-xs text-white text-center"
-                                    />
+                                  <div className="sm:col-span-1 flex justify-between sm:block text-right">
+                                    <span className="sm:hidden text-[9px] font-bold text-slate-500 uppercase">Protein</span>
+                                    <span className="text-xs text-slate-300">{item.protein || 0}</span>
                                   </div>
-
-                                  <div className="md:col-span-1">
-                                    <label className="block text-[9px] uppercase text-slate-400 font-semibold mb-0.5">Carbs</label>
-                                    <input
-                                      type="text"
-                                      readOnly
-                                      value={item.carbs}
-                                      className="w-full bg-slate-900 border border-slate-800 rounded-lg px-2 py-2 text-xs text-white text-center"
-                                    />
+                                  <div className="sm:col-span-1 flex justify-between sm:block text-right">
+                                    <span className="sm:hidden text-[9px] font-bold text-slate-500 uppercase">Carbs</span>
+                                    <span className="text-xs text-slate-300">{item.carbs || 0}</span>
                                   </div>
-
-                                  <div className="md:col-span-1">
-                                    <label className="block text-[9px] uppercase text-slate-400 font-semibold mb-0.5">Fett</label>
-                                    <input
-                                      type="text"
-                                      readOnly
-                                      value={item.fat}
-                                      className="w-full bg-slate-900 border border-slate-800 rounded-lg px-2 py-2 text-xs text-white text-center"
-                                    />
+                                  <div className="sm:col-span-1 flex justify-between sm:block text-right">
+                                    <span className="sm:hidden text-[9px] font-bold text-slate-500 uppercase">Fett</span>
+                                    <span className="text-xs text-slate-300">{item.fat || 0}</span>
                                   </div>
-
-                                  <div className="md:col-span-2 flex justify-end items-end pt-1 md:pt-0">
-                                    {meal.items.length > 1 && (
-                                      <button
-                                        type="button"
-                                        onClick={() => handleRemoveFoodItemFromMeal(mealIndex, itemIndex)}
-                                        className="bg-red-500/10 hover:bg-red-500/20 text-red-400 border border-red-500/30 p-2 rounded-lg text-xs cursor-pointer transition w-full text-center font-bold"
-                                      >
-                                        &times; Entfernen
-                                      </button>
-                                    )}
+                                  <div className="sm:col-span-1 flex justify-end sm:justify-center">
+                                    <button type="button" onClick={() => handleRemoveFoodItemFromMeal(mIdx, iIdx)} className="text-slate-500 hover:text-red-400 p-1 cursor-pointer"><Trash2 size={14} /></button>
                                   </div>
                                 </div>
                               );
                             })}
+                            <button
+                              type="button"
+                              onClick={() => handleAddFoodItemToMeal(mIdx)}
+                              className="w-full bg-slate-900/50 hover:bg-slate-900 border border-slate-800 border-dashed text-slate-400 hover:text-emerald-400 py-1.5 rounded-lg text-[11px] font-bold transition flex items-center justify-center gap-1.5 cursor-pointer mt-2"
+                            >
+                              <Plus size={12} /> Zutat hinzufügen
+                            </button>
                           </div>
                         </div>
-                      ))}
-                    </div>
+                      );
+                    })}
+                    <button
+                      type="button"
+                      onClick={handleAddMealRow}
+                      className="w-full bg-emerald-500/10 hover:bg-emerald-500/20 border border-emerald-500/30 text-emerald-400 py-2.5 rounded-xl text-xs font-bold transition flex items-center justify-center gap-1.5 cursor-pointer mt-4"
+                    >
+                      <Plus size={14} /> Neue Mahlzeit-Box hinzufügen
+                    </button>
                   </div>
                 </div>
               </div>
@@ -2478,9 +2388,10 @@ export default function TrainerDashboard() {
               <button
                 type="submit"
                 disabled={nutritionSaving}
-                className="w-full bg-emerald-500 hover:bg-emerald-600 text-slate-950 font-bold py-3.5 rounded-xl text-sm transition shadow-lg shadow-emerald-500/20 cursor-pointer"
+                className="w-full bg-emerald-500 hover:bg-emerald-600 text-slate-950 font-bold py-3.5 rounded-xl text-sm transition shadow-lg shadow-emerald-500/20 cursor-pointer flex items-center justify-center gap-2"
               >
-                {nutritionSaving ? 'Übertrage Ernährungs-Monatsplan...' : 'Gesamten Ernährungs-Monatsplan übertragen'}
+                {nutritionSaving ? 'Speichere...' : 'Ernährungsplan an Kunden senden'}
+                {!nutritionSaving && <CheckCircle size={16} />}
               </button>
             </form>
           </div>
@@ -2488,230 +2399,138 @@ export default function TrainerDashboard() {
 
       </section>
 
-      {/* Modal zum Hinzufügen neuer Lebensmittel */}
+      {/* Lebensmittel Hinzufügen Modal */}
       {isFoodModalOpen && (
-        <div className="fixed inset-0 bg-black/80 backdrop-blur-sm flex items-center justify-center z-50 p-4">
-          <div className="bg-slate-900 border border-slate-800 rounded-2xl w-full max-w-md p-6 shadow-2xl space-y-4">
-            <h2 className="text-base font-bold text-white flex items-center gap-2">
-              <Utensils size={18} className="text-emerald-400" /> Neues Lebensmittel zur Datenbank hinzufügen
-            </h2>
-            <p className="text-xs text-slate-400">Trage die Nährwerte bezogen auf 100g ein.</p>
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-950/80 backdrop-blur-sm p-4">
+          <div className="bg-slate-900 border border-slate-800 rounded-2xl p-6 w-full max-w-md shadow-2xl relative">
+            <button 
+              onClick={() => setIsFoodModalOpen(false)}
+              className="absolute top-4 right-4 text-slate-400 hover:text-white transition"
+            >
+              <XCircle size={20} />
+            </button>
+            <h3 className="text-lg font-bold text-white mb-2">Neues Lebensmittel anlegen</h3>
+            <p className="text-xs text-slate-400 mb-6">Trage die Nährwerte pro 100g ein. Das Lebensmittel wird in deiner Datenbank gespeichert.</p>
 
             <form onSubmit={handleAddNewFood} className="space-y-4">
               <div>
-                <label className="block text-xs font-semibold text-slate-400 mb-1">Name des Lebensmittels</label>
-                <input 
-                  type="text" 
-                  required
-                  placeholder="z.B. Haferflocken"
-                  value={newFoodName}
-                  onChange={(e) => setNewFoodName(e.target.value)}
-                  className="w-full bg-slate-950 border border-slate-800 rounded-xl px-3.5 py-2.5 text-xs text-white focus:outline-none focus:border-emerald-500"
-                />
+                <label className="block text-xs font-semibold text-slate-400 uppercase tracking-wider mb-1.5">Name</label>
+                <input required type="text" value={newFoodName} onChange={(e) => setNewFoodName(e.target.value)} className="w-full bg-slate-950 border border-slate-800 rounded-lg px-3 py-2 text-sm text-white focus:border-emerald-500" placeholder="z.B. Apfel (frisch)" />
               </div>
-
-              <div className="grid grid-cols-2 gap-3">
+              <div className="grid grid-cols-2 gap-4">
                 <div>
-                  <label className="block text-xs font-semibold text-slate-400 mb-1">Kalorien (kcal / 100g)</label>
-                  <input 
-                    type="number" 
-                    required
-                    placeholder="370"
-                    value={newFoodKcal}
-                    onChange={(e) => setNewFoodKcal(e.target.value)}
-                    className="w-full bg-slate-950 border border-slate-800 rounded-xl px-3.5 py-2.5 text-xs text-white focus:outline-none focus:border-emerald-500"
-                  />
+                  <label className="block text-xs font-semibold text-slate-400 uppercase tracking-wider mb-1.5">Kcal (pro 100g)</label>
+                  <input required type="number" step="0.1" value={newFoodKcal} onChange={(e) => setNewFoodKcal(e.target.value)} className="w-full bg-slate-950 border border-slate-800 rounded-lg px-3 py-2 text-sm text-white focus:border-emerald-500" />
                 </div>
                 <div>
-                  <label className="block text-xs font-semibold text-slate-400 mb-1">Protein (g / 100g)</label>
-                  <input 
-                    type="number" 
-                    step="0.1"
-                    placeholder="13.5"
-                    value={newFoodProtein}
-                    onChange={(e) => setNewFoodProtein(e.target.value)}
-                    className="w-full bg-slate-950 border border-slate-800 rounded-xl px-3.5 py-2.5 text-xs text-white focus:outline-none focus:border-emerald-500"
-                  />
-                </div>
-              </div>
-
-              <div className="grid grid-cols-2 gap-3">
-                <div>
-                  <label className="block text-xs font-semibold text-slate-400 mb-1">Kohlenhydrate (g / 100g)</label>
-                  <input 
-                    type="number" 
-                    step="0.1"
-                    placeholder="58.7"
-                    value={newFoodCarbs}
-                    onChange={(e) => setNewFoodCarbs(e.target.value)}
-                    className="w-full bg-slate-950 border border-slate-800 rounded-xl px-3.5 py-2.5 text-xs text-white focus:outline-none focus:border-emerald-500"
-                  />
+                  <label className="block text-xs font-semibold text-slate-400 uppercase tracking-wider mb-1.5">Protein (g)</label>
+                  <input required type="number" step="0.1" value={newFoodProtein} onChange={(e) => setNewFoodProtein(e.target.value)} className="w-full bg-slate-950 border border-slate-800 rounded-lg px-3 py-2 text-sm text-white focus:border-emerald-500" />
                 </div>
                 <div>
-                  <label className="block text-xs font-semibold text-slate-400 mb-1">Fett (g / 100g)</label>
-                  <input 
-                    type="number" 
-                    step="0.1"
-                    placeholder="7.0"
-                    value={newFoodFat}
-                    onChange={(e) => setNewFoodFat(e.target.value)}
-                    className="w-full bg-slate-950 border border-slate-800 rounded-xl px-3.5 py-2.5 text-xs text-white focus:outline-none focus:border-emerald-500"
-                  />
+                  <label className="block text-xs font-semibold text-slate-400 uppercase tracking-wider mb-1.5">Kohlenhydrate (g)</label>
+                  <input required type="number" step="0.1" value={newFoodCarbs} onChange={(e) => setNewFoodCarbs(e.target.value)} className="w-full bg-slate-950 border border-slate-800 rounded-lg px-3 py-2 text-sm text-white focus:border-emerald-500" />
+                </div>
+                <div>
+                  <label className="block text-xs font-semibold text-slate-400 uppercase tracking-wider mb-1.5">Fett (g)</label>
+                  <input required type="number" step="0.1" value={newFoodFat} onChange={(e) => setNewFoodFat(e.target.value)} className="w-full bg-slate-950 border border-slate-800 rounded-lg px-3 py-2 text-sm text-white focus:border-emerald-500" />
                 </div>
               </div>
-
-              <div className="flex justify-end gap-3 pt-3 border-t border-slate-800">
-                <button type="button" onClick={() => setIsFoodModalOpen(false)} className="bg-slate-800 hover:bg-slate-700 text-white px-4 py-2 rounded-xl text-xs font-medium cursor-pointer">Abbrechen</button>
-                <button type="submit" className="bg-emerald-500 hover:bg-emerald-600 text-slate-950 px-4 py-2 rounded-xl text-xs font-bold cursor-pointer">In DB speichern</button>
-              </div>
+              <button type="submit" className="w-full bg-emerald-500 hover:bg-emerald-600 text-slate-950 font-bold py-2.5 rounded-xl text-sm transition mt-2">
+                Lebensmittel speichern
+              </button>
             </form>
           </div>
         </div>
       )}
 
-      {/* Modals für Angebote und Buchungen */}
+      {/* Offer Modal */}
       {isOfferModalOpen && (
-        <div className="fixed inset-0 bg-black/80 backdrop-blur-sm flex items-center justify-center z-50 p-4">
-          <div className="bg-slate-900 border border-slate-800 rounded-2xl w-full max-w-lg p-6 shadow-2xl space-y-4">
-            <h2 className="text-base font-bold text-white">
-              {editingOfferId ? 'Angebot bearbeiten' : 'Neues Angebot erstellen'}
-            </h2>
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-950/80 backdrop-blur-sm p-4">
+          <div className="bg-slate-900 border border-slate-800 rounded-2xl p-6 w-full max-w-md shadow-2xl relative">
+            <button 
+              onClick={() => setIsOfferModalOpen(false)}
+              className="absolute top-4 right-4 text-slate-400 hover:text-white transition cursor-pointer"
+            >
+              <XCircle size={20} />
+            </button>
+            <h3 className="text-lg font-bold text-white mb-2">{editingOfferId ? 'Angebot bearbeiten' : 'Neues Angebot erstellen'}</h3>
+            <p className="text-xs text-slate-400 mb-6">Definiere Titel, Dauer und Preis für dein Trainer-Paket.</p>
+
             <form onSubmit={handleSaveOffer} className="space-y-4">
               <div>
-                <label className="block text-xs font-semibold text-slate-400 mb-1">Titel des Angebots</label>
-                <input 
-                  type="text" 
-                  required
-                  value={currentOffer.title || ''}
-                  onChange={(e) => setCurrentOffer({ ...currentOffer, title: e.target.value })}
-                  className="w-full bg-slate-950 border border-slate-800 rounded-xl px-3.5 py-2.5 text-xs text-white focus:outline-none focus:border-emerald-500"
-                />
-              </div>
-              <div className="grid grid-cols-2 gap-4">
-                <div>
-                  <label className="block text-xs font-semibold text-slate-400 mb-1">Typ</label>
-                  <select 
-                    value={currentOffer.type}
-                    onChange={(e) => {
-                      const type = e.target.value as 'discovery' | 'paid';
-                      setCurrentOffer({ ...currentOffer, type, price: type === 'discovery' ? 0 : currentOffer.price });
-                    }}
-                    className="w-full bg-slate-950 border border-slate-800 rounded-xl px-3.5 py-2.5 text-xs text-white focus:outline-none focus:border-emerald-500"
+                <label className="block text-xs font-semibold text-slate-400 uppercase tracking-wider mb-1.5">Typ</label>
+                <div className="grid grid-cols-2 gap-2">
+                  <button
+                    type="button"
+                    onClick={() => setCurrentOffer({ ...currentOffer, type: 'discovery', price: 0 })}
+                    className={`py-2 rounded-xl text-xs font-bold transition cursor-pointer border ${
+                      currentOffer.type === 'discovery' ? 'bg-emerald-500/20 border-emerald-500 text-emerald-400' : 'bg-slate-950 border-slate-800 text-slate-500 hover:text-slate-300'
+                    }`}
                   >
-                    <option value="discovery">0€ Discovery Call</option>
-                    <option value="paid">Bezahltes Angebot</option>
-                  </select>
-                </div>
-                <div>
-                  <label className="block text-xs font-semibold text-slate-400 mb-1">Dauer (Min.)</label>
-                  <input 
-                    type="number" 
-                    required
-                    value={currentOffer.duration || 60}
-                    onChange={(e) => setCurrentOffer({ ...currentOffer, duration: Number(e.target.value) })}
-                    className="w-full bg-slate-950 border border-slate-800 rounded-xl px-3.5 py-2.5 text-xs text-white focus:outline-none focus:border-emerald-500"
-                  />
+                    Kostenloses Erstgespräch
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => setCurrentOffer({ ...currentOffer, type: 'paid' })}
+                    className={`py-2 rounded-xl text-xs font-bold transition cursor-pointer border ${
+                      currentOffer.type === 'paid' ? 'bg-indigo-500/20 border-indigo-500 text-indigo-400' : 'bg-slate-950 border-slate-800 text-slate-500 hover:text-slate-300'
+                    }`}
+                  >
+                    Kostenpflichtiges Paket
+                  </button>
                 </div>
               </div>
-              {currentOffer.type === 'paid' && (
-                <div>
-                  <label className="block text-xs font-semibold text-slate-400 mb-1">Preis (€)</label>
-                  <input 
-                    type="number" 
-                    required
-                    value={currentOffer.price || 0}
-                    onChange={(e) => setCurrentOffer({ ...currentOffer, price: Number(e.target.value) })}
-                    className="w-full bg-slate-950 border border-slate-800 rounded-xl px-3.5 py-2.5 text-xs text-white focus:outline-none focus:border-emerald-500"
-                  />
-                </div>
-              )}
-              <div>
-                <label className="block text-xs font-semibold text-slate-400 mb-1">Beschreibung</label>
-                <textarea 
-                  rows={3}
-                  value={currentOffer.description || ''}
-                  onChange={(e) => setCurrentOffer({ ...currentOffer, description: e.target.value })}
-                  className="w-full bg-slate-950 border border-slate-800 rounded-xl px-3.5 py-2.5 text-xs text-white focus:outline-none focus:border-emerald-500 resize-none"
-                />
-              </div>
-              <div className="flex justify-end gap-3 pt-3 border-t border-slate-800">
-                <button type="button" onClick={() => setIsOfferModalOpen(false)} className="bg-slate-800 hover:bg-slate-700 text-white px-4 py-2 rounded-xl text-xs font-medium cursor-pointer">Abbrechen</button>
-                <button type="submit" className="bg-emerald-500 hover:bg-emerald-600 text-slate-950 px-4 py-2 rounded-xl text-xs font-bold cursor-pointer">Speichern</button>
-              </div>
-            </form>
-          </div>
-        </div>
-      )}
 
-      {/* Booking Modal */}
-      {isBookingModalOpen && (
-        <div className="fixed inset-0 bg-black/80 backdrop-blur-sm flex items-center justify-center z-50 p-4">
-          <div className="bg-slate-900 border border-slate-800 rounded-2xl w-full max-w-lg p-6 shadow-2xl space-y-4">
-            <h2 className="text-base font-bold text-white">Termin manuell eintragen</h2>
-            <form onSubmit={handleCreateBooking} className="space-y-4">
               <div>
-                <label className="block text-xs font-semibold text-slate-400 mb-1">Angebot wählen</label>
-                <select
-                  required
-                  value={selectedOfferForBooking?.id || ''}
-                  onChange={(e) => {
-                    const offer = offers.find(o => o.id === e.target.value);
-                    setSelectedOfferForBooking(offer || null);
-                  }}
-                  className="w-full bg-slate-950 border border-slate-800 rounded-xl px-3.5 py-2.5 text-xs text-white focus:outline-none focus:border-emerald-500"
-                >
-                  <option value="">Angebot auswählen...</option>
-                  {offers.map(o => (
-                    <option key={o.id} value={o.id}>{o.title} ({o.price} €)</option>
-                  ))}
-                </select>
-              </div>
-              <div>
-                <label className="block text-xs font-semibold text-slate-400 mb-1">Kundenname</label>
-                <input
-                  type="text"
-                  required
-                  value={bookingClientName}
-                  onChange={(e) => setBookingClientName(e.target.value)}
-                  className="w-full bg-slate-950 border border-slate-800 rounded-xl px-3.5 py-2.5 text-xs text-white focus:outline-none focus:border-emerald-500"
+                <label className="block text-xs font-semibold text-slate-400 uppercase tracking-wider mb-1.5">Titel des Angebots</label>
+                <input 
+                  required 
+                  type="text" 
+                  value={currentOffer.title} 
+                  onChange={(e) => setCurrentOffer({ ...currentOffer, title: e.target.value })} 
+                  className="w-full bg-slate-950 border border-slate-800 rounded-lg px-3 py-2 text-sm text-white focus:border-emerald-500" 
+                  placeholder="z.B. 10er Karte Personal Training" 
                 />
               </div>
-              <div>
-                <label className="block text-xs font-semibold text-slate-400 mb-1">Kunden-E-Mail</label>
-                <input
-                  type="email"
-                  required
-                  value={bookingClientEmail}
-                  onChange={(e) => setBookingClientEmail(e.target.value)}
-                  className="w-full bg-slate-950 border border-slate-800 rounded-xl px-3.5 py-2.5 text-xs text-white focus:outline-none focus:border-emerald-500"
-                />
-              </div>
+
               <div className="grid grid-cols-2 gap-4">
                 <div>
-                  <label className="block text-xs font-semibold text-slate-400 mb-1">Datum</label>
-                  <input
-                    type="date"
-                    required
-                    value={bookingDate}
-                    onChange={(e) => setBookingDate(e.target.value)}
-                    className="w-full bg-slate-950 border border-slate-800 rounded-xl px-3.5 py-2.5 text-xs text-white focus:outline-none focus:border-emerald-500"
+                  <label className="block text-xs font-semibold text-slate-400 uppercase tracking-wider mb-1.5">Dauer (Minuten)</label>
+                  <input 
+                    required 
+                    type="number" 
+                    value={currentOffer.duration} 
+                    onChange={(e) => setCurrentOffer({ ...currentOffer, duration: Number(e.target.value) })} 
+                    className="w-full bg-slate-950 border border-slate-800 rounded-lg px-3 py-2 text-sm text-white focus:border-emerald-500" 
                   />
                 </div>
                 <div>
-                  <label className="block text-xs font-semibold text-slate-400 mb-1">Uhrzeit</label>
-                  <input
-                    type="time"
-                    required
-                    value={bookingTime}
-                    onChange={(e) => setBookingTime(e.target.value)}
-                    className="w-full bg-slate-950 border border-slate-800 rounded-xl px-3.5 py-2.5 text-xs text-white focus:outline-none focus:border-emerald-500"
+                  <label className="block text-xs font-semibold text-slate-400 uppercase tracking-wider mb-1.5">Preis (€)</label>
+                  <input 
+                    required 
+                    type="number" 
+                    disabled={currentOffer.type === 'discovery'}
+                    value={currentOffer.type === 'discovery' ? 0 : currentOffer.price} 
+                    onChange={(e) => setCurrentOffer({ ...currentOffer, price: Number(e.target.value) })} 
+                    className={`w-full bg-slate-950 border border-slate-800 rounded-lg px-3 py-2 text-sm text-white focus:border-emerald-500 ${currentOffer.type === 'discovery' ? 'opacity-50 cursor-not-allowed' : ''}`} 
                   />
                 </div>
               </div>
-              <div className="flex justify-end gap-3 pt-3 border-t border-slate-800">
-                <button type="button" onClick={() => setIsBookingModalOpen(false)} className="bg-slate-800 hover:bg-slate-700 text-white px-4 py-2 rounded-xl text-xs font-medium cursor-pointer">Abbrechen</button>
-                <button type="submit" className="bg-emerald-500 hover:bg-emerald-600 text-slate-950 px-4 py-2 rounded-xl text-xs font-bold cursor-pointer">Eintragen</button>
+
+              <div>
+                <label className="block text-xs font-semibold text-slate-400 uppercase tracking-wider mb-1.5">Beschreibung</label>
+                <textarea
+                  value={currentOffer.description}
+                  onChange={(e) => setCurrentOffer({ ...currentOffer, description: e.target.value })}
+                  rows={3}
+                  className="w-full bg-slate-950 border border-slate-800 rounded-lg px-3 py-2 text-sm text-white focus:border-emerald-500 resize-none"
+                  placeholder="Kurze Beschreibung der Leistung..."
+                />
               </div>
+
+              <button type="submit" className="w-full bg-emerald-500 hover:bg-emerald-600 text-slate-950 font-bold py-2.5 rounded-xl text-sm transition mt-2 cursor-pointer">
+                {editingOfferId ? 'Änderungen speichern' : 'Angebot anlegen'}
+              </button>
             </form>
           </div>
         </div>

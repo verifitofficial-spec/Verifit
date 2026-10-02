@@ -32,43 +32,48 @@ export async function POST(req: Request) {
     event.type === 'checkout.session.async_payment_succeeded'
   ) {
     const session = event.data.object as Stripe.Checkout.Session;
-    const slotId = session.metadata?.slotId;
+    const bookingId = session.metadata?.bookingId;
 
-    // Nur bei erfolgreicher Bezahlung und vorhandener slotId fortfahren
-    if (session.payment_status !== 'paid' || !slotId) {
+    if (session.payment_status !== 'paid' || !bookingId) {
       return NextResponse.json({ received: true });
     }
 
-    const customerEmail = session.customer_details?.email || session.customer_email;
-
-    // Idempotentes Update: Nur aktualisieren, wenn der Slot nicht bereits 'booked' ist
+    // Idempotent: nur von 'accepted' nach 'confirmed'
     const { data, error } = await supabaseAdmin
-      .from('trainer_slots')
+      .from('bookings')
       .update({
-        status: 'booked',
-        client_email: customerEmail ?? null,
+        status: 'confirmed',
+        paid_at: new Date().toISOString(),
+        stripe_session_id: session.id,
+        stripe_payment_intent_id:
+          typeof session.payment_intent === 'string' ? session.payment_intent : null,
       })
-      .eq('id', slotId)
-      .neq('status', 'booked')
-      .select('id');
+      .eq('id', bookingId)
+      .eq('status', 'accepted')
+      .select('id, client_email, offer_title, slot_date, slot_time');
 
     if (error) {
       console.error('DB-Fehler beim Webhook-Update:', error.message);
-      return NextResponse.json({ error: 'DB-Fehler' }, { status: 500 }); // Stripe führt einen Retry aus
+      return NextResponse.json({ error: 'DB-Fehler' }, { status: 500 }); // Stripe retryt
     }
 
-    // E-Mail nur dann versenden, wenn das Update erfolgreich war (verhindert Spam bei Retries)
-    if (data && data.length > 0 && customerEmail) {
-      try {
-        await resend.emails.send({
-          from: process.env.RESEND_FROM_EMAIL || 'onboarding@resend.dev',
-          to: customerEmail,
-          subject: 'Buchungsbestätigung – VeriFit',
-          html: '<p>Vielen Dank für deine Buchung bei VeriFit! Dein Termin ist fest reserviert.</p>',
-        });
-      } catch (mailErr) {
-        console.error('Mailversand fehlgeschlagen:', mailErr);
-      }
+    if (!data || data.length === 0) {
+      // Retry (schon bestätigt) oder Zahlung nach Verfall: im zweiten Fall manuell erstatten
+      console.warn('Webhook: keine Buchung im Status accepted für', bookingId);
+      return NextResponse.json({ received: true });
+    }
+
+    const b = data[0];
+
+    try {
+      await resend.emails.send({
+        from: process.env.RESEND_FROM_EMAIL || 'onboarding@resend.dev',
+        to: b.client_email,
+        subject: 'Buchungsbestätigung – VeriFit',
+        html: `<p>Vielen Dank! Dein Termin <strong>${b.offer_title}</strong> am ${b.slot_date} um ${String(b.slot_time).slice(0, 5)} Uhr ist bezahlt und fest reserviert.</p>`,
+      });
+    } catch (mailErr) {
+      console.error('Mailversand fehlgeschlagen:', mailErr);
     }
   }
 
