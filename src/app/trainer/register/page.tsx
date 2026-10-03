@@ -42,6 +42,8 @@ export default function TrainerRegisterPage() {
       options: {
         data: {
           role: 'trainer', // Übergibt die Rolle an den Datenbank-Trigger für die profiles-Tabelle
+          name: result.data.name,
+          bio,
         },
       },
     });

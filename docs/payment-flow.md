@@ -1,6 +1,6 @@
 # Zahlungs- & Buchungsablauf
 
-> **Status:** Implementierungsdokumentation aus dem Repository. Vor dem Release muss sie gegen den Staging-DB-Export (`docs/db/*`) und die RPC-Definitionen abgeglichen werden. Diese Artefakte fehlen derzeit im Repository.
+> **Status:** Gegen den Supabase-Staging-Stand am 2026-10-03 abgeglichen.
 
 ## Verbindlicher Ablauf
 
@@ -53,21 +53,21 @@
 | `bookings.status` | `pending → accepted \| confirmed \| declined`; `accepted → confirmed` |
 | `trainer_slots.status` | `free → pending`; `pending → free \| booked` |
 
-**Stornierungen und Verfallsjobs** sind noch nicht umgesetzt. Bis eine atomare, serverseitige Stornoregel einschließlich Refund-Entscheidung vorliegt, bietet das Kunden-Portal keine direkte Slot-Freigabe an.
+Stornierungen laufen über die `cancel_booking`-RPC. Unbezahlte `accepted`-Buchungen werden über `expire_unpaid_bookings` freigegeben; die Phase-2-Migration registriert dafür, sofern verfügbar, einen `pg_cron`-Job im 15-Minuten-Intervall.
 
 ## Sicherheitsgrenzen
 
 - Jede mutierende HTTP-Route prüft Bearer-Token und serverseitig `profiles.role`.
 - `SUPABASE_SERVICE_ROLE_KEY` ist auf server-only Route-Handler-Helfer begrenzt.
 - Admin-Aktionen (Trainerstatus und Signed URLs für Prüfungsdokumente) laufen nur über geschützte Route Handler. Der Dokument-Endpoint erstellt eine Signed URL nur für einen Pfad, der in `trainers.license_document_path` oder `trainers.insurance_document_path` referenziert ist.
-- Die RPC `respond_to_booking` muss zusätzlich in SQL `auth.uid() = trainer_id`, Eigentümerschaft und erlaubte Vorstatus prüfen. Dies ist vor Staging-Freigabe anhand der DB-Definition zu verifizieren.
+- Die RPC `respond_to_booking` prüft in SQL `auth.uid() = trainer_id`, den Status `pending` und setzt bei kostenpflichtigen Angeboten `payment_due_at`.
 
-## Nicht durch das Repository verifizierbare Punkte
+## Staging-verifizierte Punkte
 
-- RLS-Policies für `profiles`, `clients`, `trainers`, `trainer_offers`, `trainer_slots`, `bookings` und Storage `verification-docs`.
-- Definition und Security-Definer-Verhalten von `respond_to_booking`.
-- Bestehende Constraints, Indizes und die atomare Behandlung von Reservation/Booking Insert.
-- Stripe Connect-Konfiguration und ein eventuelles Trainer-Payout-Modell.
+- RLS-Policies und Storage-Regeln sind in `docs/db/rls-policies.md` dokumentiert.
+- `respond_to_booking`, `cancel_booking` und `expire_unpaid_bookings` existieren im Staging-Projekt.
+- `client_plans` ist durch die Phase-2-Migration angelegt und nutzt `content` als JSON-String.
+- Stripe Connect bleibt von der gesetzten Testmodus-Konfiguration abhängig.
 
 ## Umgebungsvariablen
 

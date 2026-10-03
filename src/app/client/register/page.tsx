@@ -41,6 +41,7 @@ export default function ClientRegisterPage() {
       options: {
         data: {
           role: 'client', // Übergibt die Rolle an den Datenbank-Trigger für die profiles-Tabelle
+          name: result.data.name,
         },
       },
     });

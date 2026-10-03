@@ -55,6 +55,15 @@ type WorkoutPlan = {
   [key: string]: any;
 };
 
+type StoredPlanContent = {
+  days?: Array<{
+    templateName?: string;
+    meals?: Array<{ title?: string; items?: Array<{ name?: string; grams?: string; foodSearchInput?: string }> }>;
+    exercises?: Array<{ exercise?: string; sets?: string; reps?: string; weight?: string }>;
+  }>;
+  schedule?: Record<string, string>;
+};
+
 const DAYS_OF_WEEK = ['Montag', 'Dienstag', 'Mittwoch', 'Donnerstag', 'Freitag', 'Samstag', 'Sonntag'];
 
 export default function ClientDashboard({ params }: { params: Promise<{ id: string }> }) {
@@ -126,7 +135,7 @@ export default function ClientDashboard({ params }: { params: Promise<{ id: stri
 
       loadBookings(clientData.id);
       loadTrackingHistory(clientData.id);
-      loadPlans(clientData.email, clientData.id);
+      loadPlans(clientData.id);
       setLoading(false);
     }
 
@@ -168,11 +177,11 @@ export default function ClientDashboard({ params }: { params: Promise<{ id: stri
     }
   }
 
-  async function loadPlans(clientEmail: string, clientId?: string) {
+  async function loadPlans(userId: string) {
     const { data, error } = await supabase
       .from('client_plans')
-      .select('*')
-      .or(`client_email.eq.${clientEmail},client_id.eq.${clientId}`)
+      .select('id, plan_type, title, content, created_at')
+      .eq('user_id', userId)
       .order('created_at', { ascending: false });
 
     if (error) {
@@ -180,17 +189,33 @@ export default function ClientDashboard({ params }: { params: Promise<{ id: stri
       return;
     }
 
-    if (data) {
-      const workout = data.filter(
-        (p) => p.type === 'workout' || p.plan_type === 'workout'
-      );
-      const nutrition = data.filter(
-        (p) => p.type === 'nutrition' || p.plan_type === 'nutrition'
-      );
-
-      setWorkoutPlans(workout);
-      setNutritionPlans(nutrition);
+    const workout: WorkoutPlan[] = [];
+    const nutrition: NutritionPlan[] = [];
+    for (const plan of data ?? []) {
+      let content: StoredPlanContent;
+      try {
+        content = JSON.parse(plan.content) as StoredPlanContent;
+      } catch {
+        continue;
+      }
+      for (const [dateStr, templateName] of Object.entries(content.schedule ?? {})) {
+        const template = (content.days ?? []).find((day) => day.templateName === templateName);
+        if (!template) continue;
+        const dayOfWeek = new Intl.DateTimeFormat('de-DE', { weekday: 'long' }).format(new Date(`${dateStr}T12:00:00`));
+        if (plan.plan_type === 'workout') {
+          for (const [index, exercise] of (template.exercises ?? []).entries()) {
+            workout.push({ id: `${plan.id}-${dateStr}-${index}`, day_of_week: dayOfWeek, exercise_name: exercise.exercise, sets: Number(exercise.sets) || null, reps: exercise.reps, weight: Number(exercise.weight) || null });
+          }
+        } else if (plan.plan_type === 'nutrition') {
+          for (const [index, meal] of (template.meals ?? []).entries()) {
+            const items = (meal.items ?? []).map((item) => `${item.name || item.foodSearchInput || 'Lebensmittel'}${item.grams ? ` (${item.grams} g)` : ''}`).join(', ');
+            nutrition.push({ id: `${plan.id}-${dateStr}-${index}`, day_of_week: dayOfWeek, meal_title: meal.title, description: items || null });
+          }
+        }
+      }
     }
+    setWorkoutPlans(workout);
+    setNutritionPlans(nutrition);
   }
 
   // Speichern der Körperdaten & Freigabe
@@ -309,6 +334,16 @@ export default function ClientDashboard({ params }: { params: Promise<{ id: stri
     }
   }
 
+  async function handleCancelBooking(bookingId: string) {
+    if (!window.confirm('Möchtest du diese Buchungsanfrage wirklich stornieren?')) return;
+    const { error } = await supabase.rpc('cancel_booking', { p_booking_id: bookingId });
+    if (error) {
+      alert(error.message);
+      return;
+    }
+    await loadBookings(clientId);
+  }
+
   async function handleLogout() {
     await supabase.auth.signOut();
     router.push('/client/login');
@@ -410,14 +445,24 @@ export default function ClientDashboard({ params }: { params: Promise<{ id: stri
                         )}
                       </div>
 
-                      {booking.status === 'accepted' && Number(booking.price) > 0 && (
-                        <button
-                          onClick={() => handleCheckout(booking.id)}
-                          className="text-xs bg-emerald-500 hover:bg-emerald-600 text-slate-950 font-bold px-4 py-2 rounded-xl cursor-pointer"
-                        >
-                          Jetzt bezahlen
-                        </button>
-                      )}
+                      <div className="flex items-center gap-2">
+                        {booking.status === 'accepted' && Number(booking.price) > 0 && (
+                          <button
+                            onClick={() => handleCheckout(booking.id)}
+                            className="text-xs bg-emerald-500 hover:bg-emerald-600 text-slate-950 font-bold px-4 py-2 rounded-xl cursor-pointer"
+                          >
+                            Jetzt bezahlen
+                          </button>
+                        )}
+                        {['pending', 'accepted'].includes(booking.status) && (
+                          <button
+                            onClick={() => handleCancelBooking(booking.id)}
+                            className="text-xs bg-slate-800 hover:bg-slate-700 border border-slate-700 text-slate-300 font-bold px-3 py-2 rounded-xl cursor-pointer"
+                          >
+                            Stornieren
+                          </button>
+                        )}
+                      </div>
                     </div>
                   );
                 })}

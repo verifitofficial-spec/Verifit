@@ -5,6 +5,7 @@ import { useRouter } from 'next/navigation';
 import Link from 'next/link';
 import { supabase } from '@/app/lib/supabase';
 import Chat from '@/components/Chat';
+import { AVAILABLE_SPECIALTIES } from '@/lib/constants';
 import { 
   Calendar as CalendarIcon, 
   Clock, 
@@ -21,33 +22,6 @@ import {
   Dumbbell,
   Utensils
 } from 'lucide-react';
-
-const AVAILABLE_SPECIALTIES = [
-  'Athletiktraining',
-  'Ernährungsberatung',
-  'Fettabbau',
-  'Functional Training',
-  'Gewichtsmanagement',
-  'Ganzkörpertraining',
-  'Gesundheitsorientiertes Krafttraining',
-  'HIIT & Cardio',
-  'Hypertrophie',
-  'Körperhaltung & Core',
-  'Leistungsdiagnostik',
-  'Lauftraining & Ausdauer',
-  'Mobility & Stretching',
-  'Muskelaufbau',
-  'Postnatales Training',
-  'Pränatales Training',
-  'Reha & Prävention',
-  'Rückentraining',
-  'Seniorenfitness',
-  'Stoffwechseloptimierung',
-  'Stressabbau & Entspannung',
-  'Sportartspezifisches Training',
-  'Transformation',
-  'Yogalates & Core'
-].sort((a, b) => a.localeCompare(b, 'de'));
 
 const EXERCISE_OPTIONS = [
   'Langhantel-Bankdrücken',

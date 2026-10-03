@@ -4,18 +4,7 @@ import { useEffect, useState } from 'react';
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
 import { supabase } from '@/app/lib/supabase';
-
-// Exportierte Liste der Spezialisierungen / Quiz-Kategorien
-export const AVAILABLE_SPECIALTIES = [
-  'Gewichtsverlust',
-  'Muskelaufbau',
-  'Body-Transformation',
-  'Mobilität',
-  'Functional Fitness',
-  'Krafttraining',
-  'Ernährungsberatung',
-  'Rehabilitation'
-];
+import { QUIZ_GOAL_BLOCKS } from '@/lib/constants';
 
 type Trainer = {
   id: string;
@@ -37,25 +26,6 @@ type QuizAnswers = {
   mode: string;
   budget: string;
 };
-
-const MASTER_GOAL_BLOCKS = [
-  {
-    category: "Hypertrophie & Muskelaufbau",
-    items: ["Muskelaufbau", "Hypertrophie", "Krafttraining", "Bodybuilding"]
-  },
-  {
-    category: "Gewichtsverlust & Transformation",
-    items: ["Gewichtsverlust", "Abnehmen", "Fettabbau", "Body-Transformation", "Ernährungsberatung"]
-  },
-  {
-    category: "Gesundheit & Prävention",
-    items: ["Rückentraining", "Reha", "Rehabilitation", "Haltung", "Schmerzprävention", "Mobilität"]
-  },
-  {
-    category: "Performance & Athletik",
-    items: ["Leistungsdiagnostik", "Athletiktraining", "Ausdauer", "Functional Fitness"]
-  }
-];
 
 export default function QuizPage() {
   const router = useRouter();
@@ -315,7 +285,7 @@ export default function QuizPage() {
 
             {step === 2 && (
               <div className="space-y-6 max-w-xl mx-auto w-full pt-2">
-                {MASTER_GOAL_BLOCKS.map((block) => (
+                {QUIZ_GOAL_BLOCKS.map((block) => (
                   <div key={block.category} className="space-y-2">
                     <h3 className="text-xs font-bold uppercase tracking-wider text-slate-500 px-1">
                       {block.category}

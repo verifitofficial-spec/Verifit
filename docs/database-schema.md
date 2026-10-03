@@ -38,14 +38,14 @@ Wird bei jedem Login geprüft (siehe @docs/auth-flow.md). Befüllung erfolgt off
 - `client_email`, `client_name` (bei Buchung teils direkt in `title` eingebettet, teils als eigene Spalten — uneinheitlich, siehe `trainer/[id]/page.tsx` vs. `quiz/page.tsx`)
 
 ## `client_plans`
-Generischer Container für Trainings- und Ernährungspläne (ein Table für beide Typen).
+Generischer Container für Trainings- und Ernährungspläne (auf Staging durch Migration `20261003210000_phase2_rls_client_plans` angelegt).
 - `trainer_id`, `user_id` (= Client)
 - `plan_type`: `'workout' | 'nutrition'`
 - `title`
 - `content`: JSON-String (via `JSON.stringify`) mit Struktur `{ duration_period, days: [...Templates...], schedule: { [dateStr]: templateName } }`
 - `created_at`
 
-Beim Lesen muss `content` mit `JSON.parse` deserialisiert werden (im aktuellen Code wird `client_plans` clientseitig nur geschrieben, nicht wieder ausgelesen/angezeigt — das Client-Dashboard liest stattdessen direkt aus `nutrition_plans`/`workout_plans`, siehe unten. Das deutet auf zwei parallele, nicht synchronisierte Datenmodelle hin).
+Beim Lesen wird `content` mit `JSON.parse` deserialisiert. `schedule[dateStr]` löst den Template-Namen aus `days` auf; das Client-Dashboard projiziert die enthaltenen Mahlzeiten bzw. Übungen auf den jeweiligen Wochentag.
 
 ## `nutrition_plans`
 - `client_id`, `day_of_week` (deutscher Wochentagsname, z.B. `"Montag"`)

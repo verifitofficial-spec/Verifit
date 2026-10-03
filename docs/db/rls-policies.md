@@ -1,28 +1,23 @@
-tablename,policyname,permissive,roles,cmd,qual,with_check
-bookings,bookings_read_participants,PERMISSIVE,{authenticated},SELECT,((auth.uid() = client_id) OR (auth.uid() = trainer_id) OR is_admin()),null
-client_trackings,Erlaube allen Zugriff auf client_trackings,PERMISSIVE,{public},ALL,true,true
-clients,Clients können eigenes Profil lesen,PERMISSIVE,{authenticated},ALL,(auth.uid() = id),(auth.uid() = id)
-clients,Users can insert their own client profile.,PERMISSIVE,{authenticated},INSERT,null,(auth.uid() = id)
-foods,Öffentlicher Lesezugriff für Foods,PERMISSIVE,{public},SELECT,true,null
-messages,Users can insert messages,PERMISSIVE,{public},INSERT,null,(auth.uid() = sender_id)
-messages,Users can view their own messages,PERMISSIVE,{public},SELECT,((auth.uid() = sender_id) OR (auth.uid() = receiver_id)),null
-profiles,Users can read own profile,PERMISSIVE,{authenticated},SELECT,(auth.uid() = id),null
-trainer_offers,offers_read,PERMISSIVE,{public},SELECT,"((is_active AND (EXISTS ( SELECT 1
-   FROM trainers t
-  WHERE ((t.id = trainer_offers.trainer_id) AND (t.status = 'approved'::text))))) OR (auth.uid() = trainer_id) OR is_admin())",null
-trainer_offers,offers_trainer_write,PERMISSIVE,{authenticated},ALL,(auth.uid() = trainer_id),(auth.uid() = trainer_id)
-trainer_slots,slots_public_read,PERMISSIVE,{public},SELECT,true,null
-trainer_slots,slots_trainer_delete_free,PERMISSIVE,{authenticated},DELETE,((auth.uid() = trainer_id) AND (status = 'free'::text)),null
-trainer_slots,slots_trainer_insert,PERMISSIVE,{authenticated},INSERT,null,((auth.uid() = trainer_id) AND (status = 'free'::text))
-trainers,Admin update trainers,PERMISSIVE,{authenticated},UPDATE,"(EXISTS ( SELECT 1
-   FROM profiles
-  WHERE ((profiles.id = auth.uid()) AND (profiles.role = 'admin'::text))))","(EXISTS ( SELECT 1
-   FROM profiles
-  WHERE ((profiles.id = auth.uid()) AND (profiles.role = 'admin'::text))))"
-trainers,Allow public insert,PERMISSIVE,"{anon,authenticated}",INSERT,null,true
-trainers,Trainer can update own profile,PERMISSIVE,{authenticated},UPDATE,(email = (auth.jwt() ->> 'email'::text)),(email = (auth.jwt() ->> 'email'::text))
-trainers,Trainer dürfen ihren Status nicht selbst ändern,PERMISSIVE,{public},UPDATE,(auth.uid() = id),"((auth.uid() = id) AND (status = ( SELECT trainers_1.status
-   FROM trainers trainers_1
-  WHERE (trainers_1.id = auth.uid()))))"
-trainers,Trainer können sich nur als pending registrieren,PERMISSIVE,{public},INSERT,null,((auth.uid() = id) AND (status = 'pending'::text))
-trainers,Öffentlicher Lesezugriff,PERMISSIVE,{public},SELECT,true,null
+# RLS-Policies – Supabase Staging
+
+Der Stand wurde am 2026-10-03 per Supabase-Konnektor direkt aus `pg_policies` geprüft und anschließend mit der Phase-2-Migration gehärtet.
+
+| Bereich | Erlaubt |
+| --- | --- |
+| `trainers` | Öffentlichkeit liest nur genehmigte Trainer; eigener Trainer darf Profilfelder ändern; Status, Stripe-ID, `charges_enabled`, ID und E-Mail werden per Trigger geschützt; Admin darf verwalten. |
+| `profiles` | Benutzer liest nur eigenes Profil; Admin darf verwalten; Rollenänderung durch Nicht-Admin wird per Trigger abgelehnt. |
+| `clients` | Kunde liest/ändert eigenes Profil; Trainer liest nur Kunden mit eigener Buchung; Admin darf verwalten. |
+| `trainer_slots` | Öffentlichkeit liest freie Slots; Trainer legt eigene freie Slots an und löscht eigene freie Slots; Kunden ändern keine Slots. |
+| `bookings` | Nur zugehöriger Kunde, Trainer oder Admin liest; Änderungen erfolgen über Route Handler/RPC. |
+| `messages` | Nur Absender/Empfänger lesen; Versand nur mit eigener Absender-ID und bestehender Buchung oder bestehendem Nachrichtenverlauf. |
+| `client_plans` | Kunde und zugehöriger Trainer lesen; Trainer schreibt/ändert/löscht nur eigene Pläne für Kunden mit eigener Buchung. |
+| `storage/verification-docs` | Privat; eigener Trainerordner und Admin lesen/löschen, eigener Trainerordner darf hochladen. |
+| `storage/avatars` | Öffentliches Lesen; authentifizierter Trainer darf nur den eigenen Ordner schreiben/ändern/löschen. |
+
+## Negative Tests
+
+Die SQL-/RLS-Testmatrix für die Preview ist in `docs/RELEASE-REPORT.md` beschrieben. Besonders wichtig: Ein Trainer-Token darf `trainers.status`, `stripe_account_id` oder `charges_enabled` nicht auf einen anderen Wert setzen; ein Client-Token darf weder Slots noch fremde Buchungen oder fremde Pläne ändern.
+
+## Historische Abweichungen
+
+Vor der Migration existierten permissive Legacy-Policies, unter anderem öffentliche Insert-Policies für `trainers`, `clients`, `messages` und öffentliche Lese-/Upload-Policies für `verification-docs`. Diese wurden auf Staging entfernt. Die Auth-Trigger-Funktion verwendet weiterhin `security definer` mit leerem `search_path` und akzeptiert nur die Rollen `client` und `trainer` aus Signup-Metadaten.
