@@ -1,7 +1,7 @@
 'use client';
 
 import { useEffect, useState } from 'react';
-import { useRouter } from 'next/navigation';
+import { useParams, useRouter } from 'next/navigation';
 import Link from 'next/link';
 import { supabase } from '@/app/lib/supabase';
 import Chat from '@/components/Chat';
@@ -180,6 +180,8 @@ export default function TrainerDashboard() {
   const [saving, setSaving] = useState(false);
   const [message, setMessage] = useState('');
   const router = useRouter();
+  const params = useParams<{ id: string }>();
+  const trainerId = params.id;
 
   const [name, setName] = useState('');
   const [bio, setBio] = useState('');
@@ -292,15 +294,15 @@ export default function TrainerDashboard() {
   useEffect(() => {
     async function loadTrainerData() {
       const { data: { user } } = await supabase.auth.getUser();
-      if (!user) {
-        router.push('/login');
+      if (!user || user.id !== trainerId) {
+        router.push('/trainer/login');
         return;
       }
 
       const { data } = await supabase
         .from('trainers')
         .select('*')
-        .eq('email', user.email)
+        .eq('id', user.id)
         .single();
 
       if (data) {
@@ -330,14 +332,14 @@ export default function TrainerDashboard() {
         loadSlots(data.id);
         loadOffers(data.id);
         loadBookings(data.id);
-        loadClients();
+        loadClients(data.id);
         loadFoodDatabase();
       }
       setLoading(false);
     }
 
     loadTrainerData();
-  }, [router]);
+  }, [router, trainerId]);
 
   async function handleUploadDocument(file: File, type: 'license' | 'insurance') {
     if (!trainer) return;
@@ -473,16 +475,26 @@ export default function TrainerDashboard() {
   }
 
   // Punkt 4: Sauber aus 'clients' auslesen (ohne verwaiste users-Abfragen)
-  async function loadClients() {
+  async function loadClients(trainerId: string) {
     const { data, error } = await supabase
-      .from('clients')
-      .select('id, name, email');
+      .from('bookings')
+      .select('client_id, client_name, client_email, status')
+      .eq('trainer_id', trainerId)
+      .eq('status', 'confirmed');
       
     if (error) {
       console.error('Fehler beim Laden der Kunden:', error.message);
       return;
     }
-    if (data) setClients(data);
+    const uniqueClients = new Map<string, { id: string; name: string; email: string }>();
+    for (const booking of data ?? []) {
+      uniqueClients.set(booking.client_id, {
+        id: booking.client_id,
+        name: booking.client_name,
+        email: booking.client_email,
+      });
+    }
+    setClients(Array.from(uniqueClients.values()));
   }
 
   async function loadFoodDatabase() {

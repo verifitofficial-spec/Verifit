@@ -11,7 +11,7 @@ interface Trainer {
   city: string | null;
   service_mode: string | null;
   specialties: string | null;
-  availability_status: string | null;
+  verified: boolean;
 }
 
 export default function PublicTrainersPage() {
@@ -23,9 +23,8 @@ export default function PublicTrainersPage() {
   useEffect(() => {
     async function fetchApprovedTrainers() {
       const { data, error } = await supabase
-        .from('trainers')
-        .select('id, name, bio, city, service_mode, specialties, availability_status')
-        .eq('status', 'approved')
+        .from('trainers_public')
+        .select('id, name, bio, city, service_mode, specialties, verified')
         .order('name', { ascending: true });
 
       if (error) {

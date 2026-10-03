@@ -12,6 +12,9 @@ export default function ClientRegisterPage() {
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [confirmPassword, setConfirmPassword] = useState('');
+  const [healthDataConsent, setHealthDataConsent] = useState(false);
+  const [termsConsent, setTermsConsent] = useState(false);
+  const [privacyConsent, setPrivacyConsent] = useState(false);
   const [loading, setLoading] = useState(false);
   const [errorMessage, setErrorMessage] = useState('');
   const [fieldErrors, setFieldErrors] = useState<{ name?: string; email?: string; password?: string; confirmPassword?: string }>({});
@@ -33,6 +36,11 @@ export default function ClientRegisterPage() {
       return;
     }
 
+    if (!healthDataConsent || !termsConsent || !privacyConsent) {
+      setErrorMessage('Bitte bestätige alle erforderlichen Einwilligungen.');
+      return;
+    }
+
     setLoading(true);
 
     const { data: authData, error: authError } = await supabase.auth.signUp({
@@ -40,7 +48,14 @@ export default function ClientRegisterPage() {
       password: result.data.password,
       options: {
         data: {
-          role: 'client', // Übergibt die Rolle an den Datenbank-Trigger für die profiles-Tabelle
+          role: 'client',
+          name: result.data.name,
+          consents: {
+            health_data: healthDataConsent,
+            terms: termsConsent,
+            privacy: privacyConsent,
+            version: '2026-10-01',
+          },
         },
       },
     });
@@ -53,23 +68,11 @@ export default function ClientRegisterPage() {
 
     const user = authData.user;
 
-    if (user) {
-      const { error: clientError } = await supabase.from('clients').insert([
-        {
-          id: user.id,
-          name: result.data.name,
-          email: result.data.email,
-        },
-      ]);
-
-      if (clientError) {
-        setErrorMessage('Fehler beim Speichern des Profils: ' + clientError.message);
-        setLoading(false);
-        return;
-      }
-
-      // Direkte Weiterleitung mit Template-Literal
+    if (user && authData.session) {
       router.push(`/client/${user.id}/dashboard`);
+    } else if (user) {
+      setErrorMessage('Registrierung erfolgreich. Bitte bestätige zuerst deine E-Mail-Adresse.');
+      setLoading(false);
     } else {
       setErrorMessage('Registrierung fehlgeschlagen.');
       setLoading(false);
@@ -167,12 +170,22 @@ export default function ClientRegisterPage() {
                 id="healthDataConsent"
                 name="healthDataConsent"
                 required
+                checked={healthDataConsent}
+                onChange={(event) => setHealthDataConsent(event.target.checked)}
                 className="mt-1 w-4 h-4 rounded border-slate-700 bg-slate-950 text-emerald-500 focus:ring-emerald-500 cursor-pointer"
               />
               <label htmlFor="healthDataConsent" className="text-xs text-slate-400 leading-tight">
                 Ich willige ausdrücklich ein, dass meine sensiblen Gesundheitsdaten (wie Körpergewicht, Stimmung, Schlaf) zur Auswertung und Anpassung meiner Trainingsziele durch VeriFit und verbundene Trainer verarbeitet werden (gemäß Art. 9 DSGVO). Diese Einwilligung kann ich jederzeit widerrufen.
               </label>
             </div>
+            <label className="flex items-start gap-3 text-xs text-slate-400 leading-tight">
+              <input type="checkbox" required checked={termsConsent} onChange={(event) => setTermsConsent(event.target.checked)} className="mt-1 w-4 h-4" />
+              <span>Ich bestätige, die AGB gelesen zu haben. <em>{/* VOM ANWALT PRÜFEN */}</em></span>
+            </label>
+            <label className="flex items-start gap-3 text-xs text-slate-400 leading-tight">
+              <input type="checkbox" required checked={privacyConsent} onChange={(event) => setPrivacyConsent(event.target.checked)} className="mt-1 w-4 h-4" />
+              <span>Ich bestätige, die Datenschutzerklärung gelesen zu haben. <em>{/* VOM ANWALT PRÜFEN */}</em></span>
+            </label>
 
             <button
               type="submit"

@@ -60,11 +60,10 @@ export default function TrainerLoginPage() {
         return;
       }
 
-      // Wir holen die echte Trainer-ID anhand der E-Mail aus der trainers-Tabelle
       const { data: trainerData } = await supabase
         .from('trainers')
         .select('id')
-        .eq('email', user.email)
+        .eq('id', user.id)
         .single();
 
       if (trainerData) {
@@ -142,6 +141,9 @@ export default function TrainerLoginPage() {
             >
               {loading ? 'Logge ein...' : 'Anmelden'}
             </button>
+            <Link href="/forgot-password" className="block text-center text-xs text-emerald-400 hover:underline">
+              Passwort vergessen?
+            </Link>
           </form>
 
           <div className="mt-6 text-center text-xs text-slate-500">

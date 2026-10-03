@@ -13,6 +13,8 @@ export default function TrainerRegisterPage() {
   const [password, setPassword] = useState('');
   const [confirmPassword, setConfirmPassword] = useState('');
   const [bio, setBio] = useState('');
+  const [termsConsent, setTermsConsent] = useState(false);
+  const [privacyConsent, setPrivacyConsent] = useState(false);
   const [loading, setLoading] = useState(false);
   const [errorMessage, setErrorMessage] = useState('');
   const [fieldErrors, setFieldErrors] = useState<{ name?: string; email?: string; password?: string; confirmPassword?: string }>({});
@@ -34,6 +36,11 @@ export default function TrainerRegisterPage() {
       return;
     }
 
+    if (!termsConsent || !privacyConsent) {
+      setErrorMessage('Bitte bestätige alle erforderlichen Einwilligungen.');
+      return;
+    }
+
     setLoading(true);
 
     const { data: authData, error: authError } = await supabase.auth.signUp({
@@ -41,7 +48,14 @@ export default function TrainerRegisterPage() {
       password: result.data.password,
       options: {
         data: {
-          role: 'trainer', // Übergibt die Rolle an den Datenbank-Trigger für die profiles-Tabelle
+          role: 'trainer',
+          name: result.data.name,
+          bio,
+          consents: {
+            terms: termsConsent,
+            privacy: privacyConsent,
+            version: '2026-10-01',
+          },
         },
       },
     });
@@ -54,25 +68,11 @@ export default function TrainerRegisterPage() {
 
     const user = authData.user;
 
-    if (user) {
-      const { error: dbError } = await supabase.from('trainers').insert([
-        {
-          id: user.id, // Verknüpft den Trainer direkt mit der Supabase Auth-ID
-          name: result.data.name,
-          email: result.data.email,
-          bio,
-          status: 'pending', // Erzwingt manuelles/Admin-Approval
-        },
-      ]);
-
-      if (dbError) {
-        setErrorMessage(dbError.message);
-        setLoading(false);
-        return;
-      }
-
-      // Korrekte Weiterleitung nach erfolgreicher Registrierung zum Dashboard
+    if (user && authData.session) {
       router.push(`/trainer/${user.id}/dashboard`);
+    } else if (user) {
+      setErrorMessage('Registrierung erfolgreich. Bitte bestätige zuerst deine E-Mail-Adresse.');
+      setLoading(false);
     }
   }
 
@@ -176,6 +176,14 @@ export default function TrainerRegisterPage() {
                 className="w-full bg-slate-950 border border-slate-800 rounded-xl px-4 py-3 text-sm text-white focus:outline-none focus:border-emerald-500 resize-none h-20"
               />
             </div>
+            <label className="flex items-start gap-3 text-xs text-slate-400 leading-tight">
+              <input type="checkbox" required checked={termsConsent} onChange={(event) => setTermsConsent(event.target.checked)} className="mt-1 w-4 h-4" />
+              <span>Ich bestätige, die AGB gelesen zu haben. <em>{/* VOM ANWALT PRÜFEN */}</em></span>
+            </label>
+            <label className="flex items-start gap-3 text-xs text-slate-400 leading-tight">
+              <input type="checkbox" required checked={privacyConsent} onChange={(event) => setPrivacyConsent(event.target.checked)} className="mt-1 w-4 h-4" />
+              <span>Ich bestätige, die Datenschutzerklärung gelesen zu haben. <em>{/* VOM ANWALT PRÜFEN */}</em></span>
+            </label>
 
             <button
               type="submit"
