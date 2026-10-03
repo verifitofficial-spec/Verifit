@@ -34,12 +34,12 @@ export async function POST(req: Request) {
     const admin = getAdminClient();
     const { data: booking, error: bookingError } = await admin
       .from('bookings')
-      .select('id, client_id, client_email, offer_title, price, status, payment_due_at')
+      .select('id, client_id, client_email, offer_id, offer_title, price, status, payment_due_at')
       .eq('id', parsed.data.bookingId)
       .maybeSingle();
 
     if (bookingError) {
-      console.error('Buchung konnte nicht für Checkout geladen werden');
+      console.error('Buchung konnte nicht für Checkout geladen werden:', bookingError);
       return NextResponse.json({ error: 'Checkout konnte nicht gestartet werden.' }, { status: 500 });
     }
     if (!booking || booking.client_id !== authentication.user.id || booking.status !== 'accepted') {
@@ -69,8 +69,15 @@ export async function POST(req: Request) {
       );
     }
 
-    const stripe = new Stripe(process.env.STRIPE_SECRET_KEY!);
+    const stripeSecretKey = process.env.STRIPE_SECRET_KEY;
+    if (!stripeSecretKey) {
+      console.error('STRIPE_SECRET_KEY fehlt in den Umgebungsvariablen.');
+      return NextResponse.json({ error: 'Server-Konfigurationsfehler.' }, { status: 500 });
+    }
+
+    const stripe = new Stripe(stripeSecretKey);
     const appUrl = process.env.NEXT_PUBLIC_APP_URL || 'http://localhost:3000';
+
     const session = await stripe.checkout.sessions.create(
       {
         mode: 'payment',
@@ -88,7 +95,10 @@ export async function POST(req: Request) {
             },
           },
         ],
-        metadata: { bookingId: booking.id },
+        metadata: { 
+          bookingId: booking.id,
+          offerId: booking.offer_id || '' 
+        },
         expires_at: checkoutExpiresAt,
         success_url: `${appUrl}/checkout/success?session_id={CHECKOUT_SESSION_ID}`,
         cancel_url: `${appUrl}/client/${authentication.user.id}/dashboard?canceled=true`,
@@ -108,15 +118,15 @@ export async function POST(req: Request) {
       .eq('status', 'accepted');
 
     if (updateError) {
-      console.error('Stripe-Session konnte nicht an Buchung gespeichert werden');
+      console.error('Stripe-Session konnte nicht an Buchung gespeichert werden:', updateError);
       return NextResponse.json({ error: 'Checkout konnte nicht gestartet werden.' }, { status: 500 });
     }
 
     return NextResponse.json({ url: session.url });
   } catch (error: unknown) {
     console.error(
-      'Checkout-Session konnte nicht erstellt werden',
-      error instanceof Error ? error.name : 'Unbekannter Fehler'
+      'Checkout-Session konnte nicht erstellt werden:',
+      error instanceof Error ? error.message : 'Unbekannter Fehler'
     );
     return NextResponse.json({ error: 'Checkout konnte nicht gestartet werden.' }, { status: 500 });
   }
