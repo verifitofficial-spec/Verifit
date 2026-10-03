@@ -54,6 +54,16 @@ export async function POST(req: Request) {
     return NextResponse.json({ error: 'Ungültige Signatur.' }, { status: 400 });
   }
 
+  if (event.type === 'account.updated') {
+    const account = event.data.object as Stripe.Account;
+    const { error } = await admin
+      .from('trainers')
+      .update({ charges_enabled: account.charges_enabled })
+      .eq('stripe_account_id', account.id);
+    if (error) console.error('Stripe-Connect-Status konnte nicht gespeichert werden');
+    return NextResponse.json({ received: true });
+  }
+
   if (
     event.type !== 'checkout.session.completed' &&
     event.type !== 'checkout.session.async_payment_succeeded'

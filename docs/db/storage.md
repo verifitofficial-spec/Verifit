@@ -9,5 +9,6 @@
 | Trainer löschen eigene Dokumente | DELETE | bucket_id = 'verification-docs' AND erster Ordner = auth.uid() |
 | Trainer upload eigene Dokumente | INSERT | bucket_id = 'verification-docs' AND erster Ordner = auth.uid() |
 
-Buckets (Abfrage `select id, name, public, file_size_limit, allowed_mime_types from storage.buckets;`): noch nicht exportiert.
-Fehlend: Bucket `avatars`, Bucket für Ausweis-Uploads, Limits für Größe/MIME.
+Buckets: `avatars` (öffentlich, 5 MB, JPG/PNG/WebP) wurde in der Release-Polish-Migration für Staging angelegt.
+Der Upload ist nur im eigenen Ordner `<auth.uid()>/` erlaubt; öffentliche Leser können nur Avatar-Dateien lesen.
+`verification-docs` bleibt privat und wird weiterhin über Signed URLs genutzt. Ausweis-Uploads und Security-Advisor-Export sind weiterhin offen.

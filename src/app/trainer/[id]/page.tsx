@@ -172,6 +172,12 @@ export default function TrainerPublicProfile() {
     );
   }
 
+  const slotsByDate = slots.reduce<Record<string, TrainerSlot[]>>((grouped, slot) => {
+    (grouped[slot.slot_date] ??= []).push(slot);
+    return grouped;
+  }, {});
+  const calendarDates = Object.keys(slotsByDate).sort();
+
   if (!trainer) {
     return (
       <main className="min-h-screen bg-slate-950 text-white flex flex-col items-center justify-center p-4">
@@ -364,25 +370,31 @@ export default function TrainerPublicProfile() {
               Aktuell sind keine freien Termine verfügbar. Schau bald wieder vorbei!
             </div>
           ) : (
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-              {slots.map((slot) => (
-                <div key={slot.id} className="bg-slate-950 border border-slate-800 rounded-xl p-4 flex justify-between items-center gap-4">
-                  <div>
-                    <span className="text-xs font-bold text-emerald-400 block mb-0.5">
-                      {slot.slot_date} um {slot.slot_time?.slice(0, 5) || '--:--'} Uhr
-                    </span>
-                    <p className="text-xs text-slate-400">Anfrage wird vom Trainer bestätigt.</p>
+            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
+              {calendarDates.map((date) => {
+                const dateLabel = new Intl.DateTimeFormat('de-DE', { weekday: 'short', day: '2-digit', month: '2-digit', year: 'numeric' }).format(new Date(`${date}T12:00:00`));
+                return (
+                  <div key={date} className="bg-slate-950 border border-slate-800 rounded-xl p-4 space-y-3">
+                    <div className="flex items-center justify-between border-b border-slate-800 pb-2">
+                      <span className="text-xs font-bold text-white capitalize">{dateLabel}</span>
+                      <span className="text-[10px] text-emerald-400">{slotsByDate[date].length} frei</span>
+                    </div>
+                    <div className="grid grid-cols-2 gap-2">
+                      {slotsByDate[date].map((slot) => (
+                        <button
+                          key={slot.id}
+                          type="button"
+                          disabled={!selectedOffer}
+                          onClick={() => setBookingSlot(slot)}
+                          className="bg-slate-900 hover:bg-emerald-500 hover:text-slate-950 border border-slate-700 hover:border-emerald-400 rounded-lg px-2 py-2 text-xs font-bold transition disabled:opacity-40 disabled:cursor-not-allowed"
+                        >
+                          {slot.slot_time?.slice(0, 5) || '--:--'} Uhr
+                        </button>
+                      ))}
+                    </div>
                   </div>
-                  <button
-                    type="button"
-                    disabled={!selectedOffer}
-                    onClick={() => setBookingSlot(slot)}
-                    className="bg-emerald-500 hover:bg-emerald-600 text-slate-950 font-bold px-4 py-2 rounded-xl text-xs transition disabled:opacity-40 disabled:cursor-not-allowed"
-                  >
-                    Anfragen
-                  </button>
-                </div>
-              ))}
+                );
+              })}
             </div>
           )}
         </div>

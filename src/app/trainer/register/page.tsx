@@ -53,27 +53,29 @@ export default function TrainerRegisterPage() {
     }
 
     const user = authData.user;
-
-    if (user) {
-      const { error: dbError } = await supabase.from('trainers').insert([
-        {
-          id: user.id, // Verknüpft den Trainer direkt mit der Supabase Auth-ID
-          name: result.data.name,
-          email: result.data.email,
-          bio,
-          status: 'pending', // Erzwingt manuelles/Admin-Approval
-        },
-      ]);
-
-      if (dbError) {
-        setErrorMessage(dbError.message);
-        setLoading(false);
-        return;
-      }
-
-      // Korrekte Weiterleitung nach erfolgreicher Registrierung zum Dashboard
-      router.push(`/trainer/${user.id}/dashboard`);
+    if (!user) {
+      setErrorMessage('Registrierung fehlgeschlagen.');
+      setLoading(false);
+      return;
     }
+
+    // Der Auth-Trigger legt das Trainerprofil atomar als pending an.
+    // Name/Bio werden danach über das authentifizierte Profilformular gepflegt.
+    if (!authData.session) {
+      setErrorMessage('Konto erstellt. Bitte bestätige zuerst deine E-Mail-Adresse und melde dich danach an.');
+      setLoading(false);
+      return;
+    }
+    const { error: profileError } = await supabase
+      .from('trainers')
+      .update({ name: result.data.name, bio })
+      .eq('id', user.id);
+    if (profileError) {
+      setErrorMessage('Konto erstellt, aber das Profil konnte nicht gespeichert werden: ' + profileError.message);
+      setLoading(false);
+      return;
+    }
+    router.push(`/trainer/${user.id}/dashboard`);
   }
 
   return (

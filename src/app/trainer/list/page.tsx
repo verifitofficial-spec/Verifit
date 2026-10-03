@@ -7,6 +7,7 @@ import { supabase } from '@/app/lib/supabase';
 interface Trainer {
   id: string;
   name: string | null;
+  avatar_url: string | null;
   bio: string | null;
   city: string | null;
   service_mode: string | null;
@@ -24,7 +25,7 @@ export default function PublicTrainersPage() {
     async function fetchApprovedTrainers() {
       const { data, error } = await supabase
         .from('trainers')
-        .select('id, name, bio, city, service_mode, specialties, availability_status')
+        .select('id, name, avatar_url, bio, city, service_mode, specialties, availability_status')
         .eq('status', 'approved')
         .order('name', { ascending: true });
 
@@ -111,7 +112,12 @@ export default function PublicTrainersPage() {
               >
                 <div className="space-y-2">
                   <div className="flex justify-between items-start gap-3">
-                    <h2 className="text-lg font-bold">{trainer.name || 'Trainer'}</h2>
+                    <div className="flex items-center gap-3">
+                      <div className="w-12 h-12 rounded-xl overflow-hidden bg-slate-800 border border-slate-700 flex items-center justify-center text-lg font-bold text-emerald-400 shrink-0">
+                        {trainer.avatar_url ? <img src={trainer.avatar_url} alt="" className="w-full h-full object-cover" /> : <span>{trainer.name?.charAt(0) || 'T'}</span>}
+                      </div>
+                      <h2 className="text-lg font-bold">{trainer.name || 'Trainer'}</h2>
+                    </div>
                     <span className="text-[10px] bg-emerald-500/10 text-emerald-400 border border-emerald-500/30 px-2 py-0.5 rounded-full font-bold whitespace-nowrap">
                       Verifiziert ✓
                     </span>

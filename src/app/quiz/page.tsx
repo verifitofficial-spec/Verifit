@@ -20,6 +20,7 @@ export const AVAILABLE_SPECIALTIES = [
 type Trainer = {
   id: string;
   name: string;
+  avatar_url?: string;
   bio: string;
   status: string;
   package_category?: string;
@@ -82,7 +83,7 @@ export default function QuizPage() {
       setLoading(true);
       const { data, error } = await supabase
         .from('trainers')
-        .select('*')
+        .select('id, name, bio, status, avatar_url, city, service_mode, specialties, package_category, package_duration, package_price')
         .eq('status', 'approved');
 
       if (error) {
@@ -435,8 +436,13 @@ export default function QuizPage() {
                 {filteredResults.map((trainer) => (
                   <div key={trainer.id} className="bg-slate-900 border border-slate-800 rounded-2xl p-6 flex flex-col justify-between space-y-6 shadow-xl">
                     <div className="space-y-3">
-                      <div className="flex justify-between items-start">
-                        <h3 className="text-xl font-bold">{trainer.name}</h3>
+                      <div className="flex justify-between items-start gap-3">
+                        <div className="flex items-center gap-3">
+                          <div className="w-12 h-12 rounded-xl overflow-hidden bg-slate-800 border border-slate-700 flex items-center justify-center text-lg font-bold text-emerald-400 shrink-0">
+                            {trainer.avatar_url ? <img src={trainer.avatar_url} alt="" className="w-full h-full object-cover" /> : <span>{trainer.name?.charAt(0) || 'T'}</span>}
+                          </div>
+                          <h3 className="text-xl font-bold">{trainer.name}</h3>
+                        </div>
                         <span className="text-xs bg-emerald-500/10 text-emerald-400 border border-emerald-500/20 px-2.5 py-1 rounded-full font-medium">
                           Verifiziert ✓
                         </span>

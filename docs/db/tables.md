@@ -125,7 +125,12 @@ Format: `spalte typ NULL? default`  (NN = NOT NULL)
 - instagram_url, tiktok_url text null
 - package_category, package_duration text null; package_price numeric null (Legacy)
 - license_document_path, insurance_document_path text null
-- (**fehlen:** avatar_url, hourly_rate, qualifications, slug, stripe_account_id, charges_enabled)
+- avatar_url text null
+- hourly_rate numeric null
+- qualifications text null
+- slug text null (partial unique index)
+- stripe_account_id text null (Stripe Connect Testmodus)
+- charges_enabled boolean NN false
 
 ## workout_plans (Legacy)
 - id uuid NN gen_random_uuid()

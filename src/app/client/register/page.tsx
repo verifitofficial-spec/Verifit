@@ -53,23 +53,21 @@ export default function ClientRegisterPage() {
 
     const user = authData.user;
 
-    if (user) {
-      const { error: clientError } = await supabase.from('clients').insert([
-        {
-          id: user.id,
-          name: result.data.name,
-          email: result.data.email,
-        },
-      ]);
-
-      if (clientError) {
-        setErrorMessage('Fehler beim Speichern des Profils: ' + clientError.message);
+    if (user && authData.session) {
+      // Der Auth-Trigger legt das Kundenprofil atomar an.
+      const { error: profileError } = await supabase
+        .from('clients')
+        .update({ name: result.data.name })
+        .eq('id', user.id);
+      if (profileError) {
+        setErrorMessage('Konto erstellt, aber das Profil konnte nicht gespeichert werden: ' + profileError.message);
         setLoading(false);
         return;
       }
-
-      // Direkte Weiterleitung mit Template-Literal
       router.push(`/client/${user.id}/dashboard`);
+    } else if (user) {
+      setErrorMessage('Konto erstellt. Bitte bestätige zuerst deine E-Mail-Adresse und melde dich danach an.');
+      setLoading(false);
     } else {
       setErrorMessage('Registrierung fehlgeschlagen.');
       setLoading(false);
