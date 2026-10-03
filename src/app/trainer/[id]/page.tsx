@@ -12,11 +12,9 @@ type PublicTrainer = {
   city: string | null;
   service_mode: string | null;
   specialties: string | null;
-  qualifications: string | null;
-  avatar_url: string | null;
   instagram_url: string | null;
   tiktok_url: string | null;
-  hourly_rate: number | null;
+  verified: boolean;
 };
 
 type TrainerOffer = {
@@ -64,12 +62,11 @@ export default function TrainerPublicProfile() {
       const [{ data: trainerData, error: trainerError }, { data: offerData }, { data: slotData }] =
         await Promise.all([
           supabase
-            .from('trainers')
+            .from('trainers_public')
             .select(
-              'id, name, bio, city, service_mode, specialties, qualifications, avatar_url, instagram_url, tiktok_url, hourly_rate'
+              'id, name, bio, city, service_mode, specialties, instagram_url, tiktok_url, verified'
             )
             .eq('id', trainerId)
-            .eq('status', 'approved')
             .maybeSingle(),
           supabase
             .from('trainer_offers')
@@ -215,17 +212,13 @@ export default function TrainerPublicProfile() {
           <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-6">
             <div className="flex items-center gap-5">
               <div className="w-20 h-20 rounded-2xl bg-slate-800 border border-slate-700 flex items-center justify-center text-2xl font-bold text-emerald-400 overflow-hidden shrink-0 shadow-inner">
-                {trainer.avatar_url ? (
-                  <img src={trainer.avatar_url} alt={trainer.name || 'Trainer'} className="w-full h-full object-cover" />
-                ) : (
-                  <span>{trainer.name?.charAt(0) || 'T'}</span>
-                )}
+                <span>{trainer.name?.charAt(0) || 'T'}</span>
               </div>
               <div>
                 <div className="flex items-center gap-3 mb-1">
                   <h1 className="text-3xl font-extrabold">{trainer.name || 'Trainer'}</h1>
                   <span className="text-xs bg-emerald-500/10 border border-emerald-500/30 text-emerald-400 px-3 py-1 rounded-full font-bold">
-                    Verifiziert ✓
+                    {trainer.verified ? 'Verifiziert ✓' : 'Trainer'}
                   </span>
                 </div>
                 <p className="text-slate-400 text-sm">
@@ -237,7 +230,7 @@ export default function TrainerPublicProfile() {
             <div className="bg-slate-950 border border-slate-800 px-5 py-3.5 rounded-xl text-right w-full md:w-auto">
               <span className="block text-[10px] text-slate-400 uppercase tracking-wider">Stundensatz / Basis</span>
               <span className="text-sm font-bold text-emerald-400">
-                {trainer.hourly_rate ? `${trainer.hourly_rate} € / Std.` : 'Auf Anfrage'}
+                Auf Anfrage
               </span>
             </div>
           </div>
@@ -260,15 +253,6 @@ export default function TrainerPublicProfile() {
                 )}
               </div>
             </div>
-
-            {trainer.qualifications && (
-              <div>
-                <h2 className="text-xs font-semibold text-slate-400 uppercase tracking-wider mb-2">Qualifikationen & Zertifikate</h2>
-                <p className="text-sm text-slate-300 whitespace-pre-line leading-relaxed bg-slate-950 p-4 rounded-xl border border-slate-800">
-                  {trainer.qualifications}
-                </p>
-              </div>
-            )}
 
             <div>
               <h2 className="text-xs font-semibold text-slate-400 uppercase tracking-wider mb-2">Über mich & Philosophie</h2>

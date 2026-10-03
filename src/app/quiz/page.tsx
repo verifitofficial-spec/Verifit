@@ -21,7 +21,7 @@ type Trainer = {
   id: string;
   name: string;
   bio: string;
-  status: string;
+  verified: boolean;
   package_category?: string;
   package_duration?: string;
   package_price?: string | number;
@@ -81,9 +81,8 @@ export default function QuizPage() {
     async function fetchApprovedTrainers() {
       setLoading(true);
       const { data, error } = await supabase
-        .from('trainers')
-        .select('*')
-        .eq('status', 'approved');
+        .from('trainers_public')
+        .select('id, name, bio, city, service_mode, specialties, verified');
 
       if (error) {
         console.error('Fehler beim Laden der Trainer:', error.message);

@@ -71,21 +71,10 @@ export default function ClientLoginPage() {
       .single();
 
     if (!existingClient) {
-      await supabase.from('clients').delete().eq('email', user.email);
-
-      const { error: insertError } = await supabase.from('clients').insert([
-        {
-          id: user.id,
-          name: user.email?.split('@')[0] || 'Kunde',
-          email: user.email,
-        },
-      ]);
-
-      if (insertError) {
-        setErrorMessage('Fehler beim Synchronisieren des Profils: ' + insertError.message);
-        setLoading(false);
-        return;
-      }
+      await supabase.auth.signOut();
+      setErrorMessage('Dein Kundenprofil ist noch nicht vollständig angelegt. Bitte kontaktiere den Support.');
+      setLoading(false);
+      return;
     }
 
     router.refresh();
@@ -152,6 +141,9 @@ export default function ClientLoginPage() {
             >
               {loading ? 'Logge ein...' : 'Anmelden'}
             </button>
+            <Link href="/forgot-password" className="block text-center text-xs text-emerald-400 hover:underline">
+              Passwort vergessen?
+            </Link>
           </form>
 
           <div className="mt-6 text-center text-xs text-slate-500">

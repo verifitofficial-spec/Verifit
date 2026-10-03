@@ -2,6 +2,7 @@
 
 import { useState } from 'react';
 import { useRouter } from 'next/navigation';
+import Link from 'next/link';
 import { supabase } from '@/app/lib/supabase';
 
 export default function AdminLoginPage() {
@@ -91,6 +92,9 @@ export default function AdminLoginPage() {
           >
             Anmelden
           </button>
+          <Link href="/forgot-password" className="block text-center text-xs text-emerald-400 hover:underline">
+            Passwort vergessen?
+          </Link>
         </form>
       </div>
     </main>
