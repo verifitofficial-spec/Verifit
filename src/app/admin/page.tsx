@@ -36,6 +36,15 @@ type Trainer = {
   availability_status?: string;
 };
 
+type AdminApiResponse = {
+  error?: string;
+  signedUrl?: string;
+  trainer?: {
+    id: string;
+    status: 'approved' | 'rejected';
+  };
+};
+
 export default function VerificationPage() {
   const [trainers, setTrainers] = useState<Trainer[]>([]);
   const [loading, setLoading] = useState(true);
@@ -86,36 +95,65 @@ export default function VerificationPage() {
     checkAdminSession();
   }, [router, fetchTrainers]);
 
-  // Signed URL generieren & PDF-Dokument in neuem Tab öffnen
+  // Signed URL nur nach serverseitiger Admin-Prüfung generieren & PDF-Dokument in neuem Tab öffnen
   async function handleViewDocument(path: string) {
     if (!path) return;
 
-    const { data, error } = await supabase.storage
-      .from('verification-docs')
-      .createSignedUrl(path, 60); // Link ist 60 Sekunden gültig
+    const {
+      data: { session },
+    } = await supabase.auth.getSession();
 
-    if (error || !data) {
-      alert('Dokument konnte nicht geöffnet werden: ' + (error?.message || 'Fehler beim Erstellen des Links'));
+    if (!session) {
+      alert('Deine Sitzung ist abgelaufen. Bitte melde dich erneut an.');
       return;
     }
 
-    window.open(data.signedUrl, '_blank');
+    const response = await fetch('/api/admin/verification-document', {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        Authorization: `Bearer ${session.access_token}`,
+      },
+      body: JSON.stringify({ path }),
+    });
+    const data = (await response.json().catch(() => ({}))) as AdminApiResponse;
+
+    if (!response.ok || !data.signedUrl) {
+      alert('Dokument konnte nicht geöffnet werden: ' + (data.error || 'Fehler beim Erstellen des Links'));
+      return;
+    }
+
+    window.open(data.signedUrl, '_blank', 'noopener,noreferrer');
   }
 
   // Status eines Trainers aktualisieren (z.B. 'approved' oder 'rejected')
   async function updateTrainerStatus(id: string, newStatus: 'approved' | 'rejected') {
-    const { error } = await supabase
-      .from('trainers')
-      .update({ status: newStatus })
-      .eq('id', id);
+    const {
+      data: { session },
+    } = await supabase.auth.getSession();
 
-    if (error) {
-      console.error('Fehler beim Aktualisieren des Status:', error.message);
-      alert('Fehler beim Speichern.');
+    if (!session) {
+      alert('Deine Sitzung ist abgelaufen. Bitte melde dich erneut an.');
+      return;
+    }
+
+    const response = await fetch('/api/admin/trainer-status', {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        Authorization: `Bearer ${session.access_token}`,
+      },
+      body: JSON.stringify({ trainerId: id, status: newStatus }),
+    });
+    const data = (await response.json().catch(() => ({}))) as AdminApiResponse;
+
+    if (!response.ok || !data.trainer) {
+      console.error('Trainerstatus konnte nicht aktualisiert werden');
+      alert(data.error || 'Fehler beim Speichern.');
     } else {
       // Liste lokal aktualisieren, damit die UI sofort reagiert
       setTrainers(prev =>
-        prev.map(t => (t.id === id ? { ...t, status: newStatus } : t))
+        prev.map(t => (t.id === data.trainer?.id ? { ...t, status: data.trainer.status } : t))
       );
     }
   }

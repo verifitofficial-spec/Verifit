@@ -1,9 +1,21 @@
 import { z } from 'zod';
 
+const uuidSchema = z.string().uuid('Ungültige Kennung');
+
 export const bookSlotSchema = z.object({
-  slotId: z.string().min(1, 'slotId fehlt'),
-  clientName: z.string().trim().min(2, 'Name muss mindestens 2 Zeichen haben').max(100),
-  clientEmail: z.string().trim().toLowerCase().email('Ungültige E-Mail-Adresse').max(254),
+  slotId: uuidSchema,
+  offerId: uuidSchema,
+});
+
+export const checkoutSchema = z.object({
+  bookingId: uuidSchema,
+});
+
+export const respondToBookingSchema = z.object({
+  bookingId: uuidSchema,
+  accept: z.boolean(),
 });
 
 export type BookSlotInput = z.infer<typeof bookSlotSchema>;
+export type CheckoutInput = z.infer<typeof checkoutSchema>;
+export type RespondToBookingInput = z.infer<typeof respondToBookingSchema>;
