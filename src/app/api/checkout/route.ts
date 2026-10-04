@@ -34,7 +34,7 @@ export async function POST(req: Request) {
     const admin = getAdminClient();
     const { data: booking, error: bookingError } = await admin
       .from('bookings')
-      .select('id, client_id, client_email, offer_id, offer_title, price, status, payment_due_at')
+      .select('id, client_id, trainer_id, client_email, offer_id, offer_title, price, status, payment_due_at')
       .eq('id', parsed.data.bookingId)
       .maybeSingle();
 
@@ -69,6 +69,15 @@ export async function POST(req: Request) {
       );
     }
 
+    const { data: trainer, error: trainerError } = await admin
+      .from('trainers')
+      .select('stripe_account_id, charges_enabled, status')
+      .eq('id', booking.trainer_id)
+      .maybeSingle();
+    if (trainerError || !trainer || trainer.status !== 'approved' || !trainer.stripe_account_id || !trainer.charges_enabled) {
+      return NextResponse.json({ error: 'Der Trainer hat Stripe Connect noch nicht vollständig eingerichtet.' }, { status: 409 });
+    }
+
     const stripeSecretKey = process.env.STRIPE_SECRET_KEY;
     if (!stripeSecretKey) {
       console.error('STRIPE_SECRET_KEY fehlt in den Umgebungsvariablen.');
@@ -77,6 +86,9 @@ export async function POST(req: Request) {
 
     const stripe = new Stripe(stripeSecretKey);
     const appUrl = process.env.NEXT_PUBLIC_APP_URL || 'http://localhost:3000';
+    const amountInCents = Math.round(Number(booking.price) * 100);
+    const platformFeePercent = Math.min(50, Math.max(0, Number(process.env.PLATFORM_FEE_PERCENT || '15')));
+    const applicationFeeAmount = Math.round(amountInCents * platformFeePercent / 100);
 
     const session = await stripe.checkout.sessions.create(
       {
@@ -87,7 +99,7 @@ export async function POST(req: Request) {
             quantity: 1,
             price_data: {
               currency: 'eur',
-              unit_amount: Math.round(Number(booking.price) * 100),
+              unit_amount: amountInCents,
               product_data: {
                 name: booking.offer_title || 'Trainingseinheit',
                 description: 'Verifizierte Trainingseinheit über VeriFit',
@@ -95,6 +107,10 @@ export async function POST(req: Request) {
             },
           },
         ],
+        payment_intent_data: {
+          application_fee_amount: applicationFeeAmount,
+          transfer_data: { destination: trainer.stripe_account_id },
+        },
         metadata: { 
           bookingId: booking.id,
           offerId: booking.offer_id || '' 

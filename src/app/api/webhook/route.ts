@@ -36,7 +36,11 @@ async function markSlotAsBooked(admin: SupabaseClient, slotId: string | null) {
 }
 
 export async function POST(req: Request) {
-  const stripe = new Stripe(process.env.STRIPE_SECRET_KEY!);
+  const stripeSecretKey = process.env.STRIPE_SECRET_KEY;
+  if (!stripeSecretKey) {
+    return NextResponse.json({ error: 'Webhook nicht konfiguriert.' }, { status: 400 });
+  }
+  const stripe = new Stripe(stripeSecretKey);
   const admin = getAdminClient();
   const body = await req.text();
   const signature = req.headers.get('stripe-signature');
@@ -61,6 +65,28 @@ export async function POST(req: Request) {
       .update({ charges_enabled: account.charges_enabled })
       .eq('stripe_account_id', account.id);
     if (error) console.error('Stripe-Connect-Status konnte nicht gespeichert werden');
+    return NextResponse.json({ received: true });
+  }
+
+  if (
+    event.type === 'checkout.session.expired' ||
+    event.type === 'checkout.session.async_payment_failed'
+  ) {
+    const session = event.data.object as Stripe.Checkout.Session;
+    const bookingId = session.metadata?.bookingId;
+    if (bookingId) {
+      const { data: expiredBooking, error: expiryError } = await admin
+        .from('bookings')
+        .update({ status: 'expired' })
+        .eq('id', bookingId)
+        .eq('status', 'accepted')
+        .select('slot_id')
+        .maybeSingle();
+      if (expiryError) console.error('Buchung konnte nach Stripe-Fehler nicht ablaufen');
+      if (expiredBooking?.slot_id) {
+        await admin.from('trainer_slots').update({ status: 'free' }).eq('id', expiredBooking.slot_id).eq('status', 'pending');
+      }
+    }
     return NextResponse.json({ received: true });
   }
 

@@ -336,9 +336,19 @@ export default function ClientDashboard({ params }: { params: Promise<{ id: stri
 
   async function handleCancelBooking(bookingId: string) {
     if (!window.confirm('Möchtest du diese Buchungsanfrage wirklich stornieren?')) return;
-    const { error } = await supabase.rpc('cancel_booking', { p_booking_id: bookingId });
-    if (error) {
-      alert(error.message);
+    const { data: { session } } = await supabase.auth.getSession();
+    if (!session) {
+      alert('Deine Sitzung ist abgelaufen. Bitte melde dich erneut an.');
+      return;
+    }
+    const response = await fetch('/api/cancel-booking', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${session.access_token}` },
+      body: JSON.stringify({ bookingId }),
+    });
+    const result = (await response.json().catch(() => ({}))) as { error?: string };
+    if (!response.ok) {
+      alert(result.error || 'Buchung konnte nicht storniert werden.');
       return;
     }
     await loadBookings(clientId);

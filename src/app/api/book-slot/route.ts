@@ -101,12 +101,15 @@ export async function POST(req: Request) {
 
   const { data: trainer, error: trainerError } = await admin
     .from('trainers')
-    .select('name, email, status')
+    .select('name, email, status, stripe_account_id, charges_enabled')
     .eq('id', slot.trainer_id)
     .maybeSingle();
 
   if (trainerError || !trainer || trainer.status !== 'approved') {
     return NextResponse.json({ error: 'Trainer nicht verfügbar.' }, { status: 404 });
+  }
+  if (Number(offer.price) > 0 && (!trainer.stripe_account_id || !trainer.charges_enabled)) {
+    return NextResponse.json({ error: 'Dieser Trainer kann derzeit noch keine bezahlten Termine annehmen.' }, { status: 409 });
   }
 
   const { data: reservedSlots, error: reservationError } = await admin

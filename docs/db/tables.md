@@ -31,6 +31,9 @@ Format: `spalte typ NULL? default`  (NN = NOT NULL)
 - paid_at timestamptz null
 - stripe_session_id text null
 - stripe_payment_intent_id text null
+- cancelled_at timestamptz null
+- refund_id text null (Stripe-Testmodus)
+- refunded_at timestamptz null
 - created_at timestamptz NN now()
 
 ## client_trackings
@@ -140,5 +143,11 @@ Format: `spalte typ NULL? default`  (NN = NOT NULL)
 - sets integer null; reps text null; weight numeric null
 - created_at timestamptz NN now() utc
 
-## Nicht vorhanden, aber vom Code benötigt
-- **client_plans** (Trainer-Dashboard schreibt dorthin, Kunden-Dashboard liest dort)
+## client_plans
+- id uuid NN gen_random_uuid()
+- trainer_id uuid NN → trainers.id
+- user_id uuid NN → clients.id
+- plan_type text NN (`workout` | `nutrition`)
+- title text NN
+- content text NN (JSON-String mit `days` und `schedule`)
+- created_at timestamptz NN now()

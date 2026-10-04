@@ -34,7 +34,7 @@
 1. Das Kunden-Portal lädt `bookings` über `client_id` und zeigt für eine eigene Buchung im Status `accepted` den Button **„Jetzt bezahlen“**.
 2. `POST /api/checkout` nimmt ausschließlich `{ bookingId }` plus Bearer-Token an.
 3. Der Server prüft Kundenrolle, Eigentümerschaft (`bookings.client_id`), Status `accepted`, positiven Preis und eine noch gültige `payment_due_at`.
-4. Stripe Checkout erhält serverseitig Preis und Angebotsdaten aus dem Buchungs-Snapshot sowie einen idempotenten Schlüssel je Buchung.
+4. Der Server verlangt bei kostenpflichtigen Angeboten `charges_enabled = true` und ein Stripe-Connect-Konto. Stripe Checkout erhält serverseitig Preis und Angebotsdaten aus dem Buchungs-Snapshot, eine 15-%-Plattformgebühr (`PLATFORM_FEE_PERCENT`) und eine Destination Charge zum Trainerkonto.
 5. Die Stripe-Session endet spätestens zu `payment_due_at`; bei einer Restlaufzeit unter 30 Minuten wird kein neuer Checkout eröffnet.
 
 ## 4. Stripe-Webhook bestätigt Zahlung
@@ -46,11 +46,18 @@
 5. Der zugehörige Slot wechselt von `pending` zu `booked`. Wiederholte Stripe-Events finalisieren den Slot idempotent, lösen aber keine zweite Bestätigungsmail aus.
 6. Kunde und Trainer erhalten eine Zahlungsbestätigung. Ein Mailfehler ändert keinen Zahlungs- oder Slotstatus.
 
+## 5. Storno und Refund
+
+1. Kunde oder Trainer ruft `POST /api/cancel-booking` mit `{ bookingId }` und Bearer-Token auf.
+2. Unbezahlte `pending`/`accepted`-Buchungen werden storniert und der Slot wird freigegeben.
+3. Bei einer bezahlten Buchung erstellt der Server im Stripe-Testmodus einen idempotenten Full Refund. Die Buchung speichert `refund_id`, `refunded_at` und `cancelled_at`.
+4. Kunden können bezahlte Termine gemäß Staging-Default bis 24 Stunden vor Beginn kostenlos stornieren; Trainerstorno erstattet unabhängig vom Zeitpunkt.
+
 ## Statusmaschine
 
 | Objekt | Zulässige Übergänge im aktuellen Ablauf |
 | --- | --- |
-| `bookings.status` | `pending → accepted \| confirmed \| declined`; `accepted → confirmed` |
+| `bookings.status` | `pending → accepted \| confirmed \| declined \| cancelled`; `accepted → confirmed \| expired \| cancelled`; `confirmed → cancelled` |
 | `trainer_slots.status` | `free → pending`; `pending → free \| booked` |
 
 Stornierungen laufen über die `cancel_booking`-RPC. Unbezahlte `accepted`-Buchungen werden über `expire_unpaid_bookings` freigegeben; die Phase-2-Migration registriert dafür, sofern verfügbar, einen `pg_cron`-Job im 15-Minuten-Intervall.
@@ -67,7 +74,7 @@ Stornierungen laufen über die `cancel_booking`-RPC. Unbezahlte `accepted`-Buchu
 - RLS-Policies und Storage-Regeln sind in `docs/db/rls-policies.md` dokumentiert.
 - `respond_to_booking`, `cancel_booking` und `expire_unpaid_bookings` existieren im Staging-Projekt.
 - `client_plans` ist durch die Phase-2-Migration angelegt und nutzt `content` als JSON-String.
-- Stripe Connect bleibt von der gesetzten Testmodus-Konfiguration abhängig.
+- Stripe Connect benötigt `STRIPE_SECRET_KEY`, `STRIPE_WEBHOOK_SECRET`, `NEXT_PUBLIC_APP_URL` und die Testmodus-Konfiguration des Trainers.
 
 ## Umgebungsvariablen
 
