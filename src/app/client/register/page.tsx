@@ -55,16 +55,8 @@ export default function ClientRegisterPage() {
     const user = authData.user;
 
     if (user && authData.session) {
-      // Der Auth-Trigger legt das Kundenprofil atomar an.
-      const { error: profileError } = await supabase
-        .from('clients')
-        .update({ name: result.data.name })
-        .eq('id', user.id);
-      if (profileError) {
-        setErrorMessage('Konto erstellt, aber das Profil konnte nicht gespeichert werden: ' + profileError.message);
-        setLoading(false);
-        return;
-      }
+      // Der Auth-Trigger legt das Kundenprofil atomar an. Ein zweiter Write ist
+      // nicht nötig und würde bei aktivierter E-Mail-Bestätigung an RLS scheitern.
       router.push(`/client/${user.id}/dashboard`);
     } else if (user) {
       setErrorMessage('Konto erstellt. Bitte bestätige zuerst deine E-Mail-Adresse und melde dich danach an.');

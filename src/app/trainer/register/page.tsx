@@ -61,22 +61,12 @@ export default function TrainerRegisterPage() {
       return;
     }
 
-    // Der Auth-Trigger legt das Trainerprofil atomar als pending an.
-    // Name/Bio werden danach über das authentifizierte Profilformular gepflegt.
     if (!authData.session) {
       setErrorMessage('Konto erstellt. Bitte bestätige zuerst deine E-Mail-Adresse und melde dich danach an.');
       setLoading(false);
       return;
     }
-    const { error: profileError } = await supabase
-      .from('trainers')
-      .update({ name: result.data.name, bio })
-      .eq('id', user.id);
-    if (profileError) {
-      setErrorMessage('Konto erstellt, aber das Profil konnte nicht gespeichert werden: ' + profileError.message);
-      setLoading(false);
-      return;
-    }
+    // Der Auth-Trigger speichert Name und Bio bereits atomar im Trainerprofil.
     router.push(`/trainer/${user.id}/dashboard`);
   }
 

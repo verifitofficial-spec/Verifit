@@ -168,14 +168,14 @@ export default function TrainerDashboard() {
   const [name, setName] = useState('');
   const [bio, setBio] = useState('');
   const [city, setCity] = useState('');
-  const [serviceMode, setServiceMode] = useState('Vor Ort & Online');
+  const [serviceMode, setServiceMode] = useState('');
   const [selectedSpecialties, setSelectedSpecialties] = useState<string[]>([]);
   const [licenseNumber, setLicenseNumber] = useState('');
   const [insuranceExpiry, setInsuranceExpiry] = useState('');
   const [packageCategory, setPackageCategory] = useState('');
   const [packageDuration, setPackageDuration] = useState('');
   const [packagePrice, setPackagePrice] = useState('');
-  const [availabilityStatus, setAvailabilityStatus] = useState('available');
+  const [availabilityStatus, setAvailabilityStatus] = useState('');
 
   // PDF Dokumentspfade & Upload States
   const [licenseDocPath, setLicenseDocPath] = useState('');
@@ -295,7 +295,7 @@ export default function TrainerDashboard() {
         setName(data.name || '');
         setBio(data.bio || '');
         setCity(data.city || '');
-        setServiceMode(data.service_mode || 'Vor Ort & Online');
+        setServiceMode(data.service_mode || '');
         
         if (data.specialties) {
           setSelectedSpecialties(
@@ -308,7 +308,7 @@ export default function TrainerDashboard() {
         setPackageCategory(data.package_category || '');
         setPackageDuration(data.package_duration || '');
         setPackagePrice(data.package_price ? String(data.package_price) : '');
-        setAvailabilityStatus(data.availability_status || 'available');
+        setAvailabilityStatus(data.availability_status || '');
 
         // Dokumentpfade für Lizenz & Versicherung laden
         setLicenseDocPath(data.license_document_path || '');

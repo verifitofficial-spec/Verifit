@@ -44,3 +44,36 @@
 7. Eine bezahlte Testbuchung über das Kundenportal stornieren; Stripe-Testrefund, `refund_id`, `refunded_at` und freie Slotanzeige prüfen.
 8. Eine `accepted`-Buchung ablaufen lassen; `pg_cron` bzw. `expire_unpaid_bookings` muss Status `expired` und Slot `free` setzen.
 9. Im Admin-Control-Center Buchungsstatus und Refund-Markierung prüfen.
+
+## Release-Polish: Auth, RLS und Dashboard (04.10.2026)
+
+### Ursachen und Fixes
+
+- **Client-Registrierung:** Nach `signUp()` wurde zusätzlich ein Browser-Update auf `clients` ausgeführt. Bei aktivierter E-Mail-Bestätigung existiert noch keine Session; der Write wurde deshalb durch RLS blockiert. Der DB-Trigger ist jetzt die einzige Quelle für `profiles` und `clients`/`trainers`; die UI macht keinen zweiten Insert/Update mehr.
+- **Auth-Trigger:** Die Rolle wird weiterhin ausschließlich auf `client`/`trainer` begrenzt; `admin` kann nicht über Signup erzeugt werden. Trigger-Helfer und `handle_new_user` sind nicht als PostgREST-RPC ausführbar.
+- **RLS:** `client_trackings` hatte eine globale `ALL`-Policy. Sie wurde durch Owner-CRUD sowie Trainer-Read nur bei Opt-in und aktiver Buchung ersetzt. Die Legacy-Tabellen `appointments`, `nutrition_plans` und `workout_plans` hatten RLS ohne Policies; sie haben jetzt eng begrenzte Teilnehmer-Policies. Eine tautologische Nachrichten-Policy wurde entfernt.
+- **Schemaabweichung:** Der Code synchronisiert `clients.weight`, die Staging-Tabelle enthielt die Spalte nicht. Migration `20261004160000_release_polish_auth_rls_and_dashboard` ergänzt sie additiv.
+- **Trainerprofil:** Leere Felder werden nicht mehr mit `service_mode`/`availability_status` vorausgefüllt. Werte kommen ausschließlich aus dem geladenen Trainerdatensatz.
+- **Terminstatus:** `respond_to_booking` setzte bei kostenpflichtiger Annahme fälschlich den Slot auf `booked`, obwohl der Slot bis zum Stripe-Webhook `pending` bleiben muss. Die RPC ist korrigiert; der Webhook bleibt der einzige Übergang zu `booked`.
+
+### Staging
+
+- Migration `20261004160000_release_polish_auth_rls_and_dashboard` erfolgreich auf Supabase-Staging `bywuucdphvrbrnjtjkkb` angewendet.
+- Live-Prüfung bestätigt `clients.weight` und die neuen Policies für Tracking, Nachrichten und Legacy-Tabellen.
+- Security Advisor zeigt die drei zuvor policy-losen Tabellen nicht mehr. Übrig bleiben die bekannten Hinweise zu SECURITY-DEFINER-Funktionen und deaktiviertem Leaked-Password-Schutz; die Funktionen werden für RLS/Trigger benötigt, direkte RPC-Rechte sind soweit möglich entzogen.
+
+### Checks
+
+- `npx tsc --noEmit`: ✅
+- `npm run lint`: ✅ (bestehende 41 Warnungen, 0 Errors)
+- `npm run build`: ✅
+- `git diff --check`: ✅
+
+### Manuelle Testschritte für Preview/Staging
+
+1. Neue Client-E-Mail mit gültigem Passwort registrieren; bei aktivierter Bestätigung darf kein „Profil konnte nicht gespeichert werden“-Fehler erscheinen. Nach Bestätigung einloggen und `/client/<eigene-id>/dashboard` öffnen.
+2. Neue Trainer-E-Mail registrieren; nach Login prüfen, dass Name/Bio aus Signup stammen, leere optionale Profilfelder leer bleiben und Profil speichern funktioniert.
+3. Als Client Tracking speichern, Seite neu laden und erneut speichern; als anderer Client darf weder Lesen noch Schreiben möglich sein.
+4. Als Trainer mit `share_data = true` und aktiver Buchung Tracking lesen; Opt-out oder fehlende aktive Buchung muss leer/abgelehnt sein.
+5. Als Trainer einen freien Slot anlegen, löschen und neu anlegen. Eine kostenpflichtige Buchung annehmen: Status `accepted`, Slot `pending`; erst nach Test-Webhook `confirmed`/`booked`.
+6. Als Client und Trainer Chat ohne gemeinsame Buchung testen (abgelehnt), danach mit gemeinsamer Buchung (erfolgreich).

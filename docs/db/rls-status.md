@@ -15,4 +15,4 @@
 | trainers | ja | nein |
 | workout_plans | ja | nein |
 
-Hinweis: `appointments`, `nutrition_plans`, `workout_plans` haben RLS ohne Policies, also für Browser-Nutzer komplett gesperrt.
+Stand nach Migration `20261004160000_release_polish_auth_rls_and_dashboard`: `appointments`, `nutrition_plans`, `workout_plans` besitzen nun restriktive Teilnehmer-Policies. `client_trackings` erlaubt Owner-CRUD sowie Trainer-Read ausschließlich bei Opt-in und aktiver Buchung.

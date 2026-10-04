@@ -64,28 +64,6 @@ export default function ClientLoginPage() {
       return;
     }
 
-    const { data: existingClient } = await supabase
-      .from('clients')
-      .select('id')
-      .eq('id', user.id)
-      .single();
-
-    if (!existingClient) {
-      const { error: insertError } = await supabase.from('clients').insert([
-        {
-          id: user.id,
-          name: user.email?.split('@')[0] || 'Kunde',
-          email: user.email,
-        },
-      ]);
-
-      if (insertError) {
-        setErrorMessage('Fehler beim Synchronisieren des Profils: ' + insertError.message);
-        setLoading(false);
-        return;
-      }
-    }
-
     router.refresh();
     router.push(`/client/${user.id}/dashboard`);
   }

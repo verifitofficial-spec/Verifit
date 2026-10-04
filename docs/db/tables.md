@@ -56,8 +56,8 @@ Format: `spalte typ NULL? default`  (NN = NOT NULL)
 - age integer null
 - gender text null
 - goal text null
-- activity_level numeric null
-- (**fehlt:** weight, wird aber vom Code geschrieben)
+- `activity_level` numeric null
+- `weight` numeric null (ergänzt durch Migration `20261004160000_release_polish_auth_rls_and_dashboard`)
 
 ## foods
 - id uuid NN gen_random_uuid()

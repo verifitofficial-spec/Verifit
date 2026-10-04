@@ -21,3 +21,10 @@ Die SQL-/RLS-Testmatrix für die Preview ist in `docs/RELEASE-REPORT.md` beschri
 ## Historische Abweichungen
 
 Vor der Migration existierten permissive Legacy-Policies, unter anderem öffentliche Insert-Policies für `trainers`, `clients`, `messages` und öffentliche Lese-/Upload-Policies für `verification-docs`. Diese wurden auf Staging entfernt. Die Auth-Trigger-Funktion verwendet weiterhin `security definer` mit leerem `search_path` und akzeptiert nur die Rollen `client` und `trainer` aus Signup-Metadaten.
+
+## Release-Polish (04.10.2026)
+
+- `client_trackings`: Owner darf CRUD; Trainer darf nur bei `share_data = true` und aktiver Buchung lesen.
+- `appointments`, `nutrition_plans`, `workout_plans`: restriktive Teilnehmer-Policies ergänzt, damit aktiviertes RLS nicht mehr ohne Policies zu unklaren Blockaden führt.
+- `messages`: tautologische Legacy-Bedingung entfernt; Insert erfordert nun eine gemeinsame aktive Buchung.
+- `handle_new_user` und Trigger-Helfer sind nicht als direkte PostgREST-RPC ausführbar. `is_admin` bleibt für RLS-Ausdrücke ausführbar und gibt für anonyme Nutzer stets `false` zurück.
