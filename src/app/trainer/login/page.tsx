@@ -60,11 +60,11 @@ export default function TrainerLoginPage() {
         return;
       }
 
-      // Wir holen die echte Trainer-ID anhand der E-Mail aus der trainers-Tabelle
+      // Das Trainerprofil ist über die unveränderliche Auth-ID verknüpft.
       const { data: trainerData } = await supabase
         .from('trainers')
         .select('id')
-        .eq('email', user.email)
+        .eq('id', user.id)
         .single();
 
       if (trainerData) {

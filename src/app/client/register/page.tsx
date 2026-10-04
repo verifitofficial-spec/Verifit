@@ -41,6 +41,7 @@ export default function ClientRegisterPage() {
       options: {
         data: {
           role: 'client', // Übergibt die Rolle an den Datenbank-Trigger für die profiles-Tabelle
+          name: result.data.name,
         },
       },
     });
@@ -53,23 +54,13 @@ export default function ClientRegisterPage() {
 
     const user = authData.user;
 
-    if (user) {
-      const { error: clientError } = await supabase.from('clients').insert([
-        {
-          id: user.id,
-          name: result.data.name,
-          email: result.data.email,
-        },
-      ]);
-
-      if (clientError) {
-        setErrorMessage('Fehler beim Speichern des Profils: ' + clientError.message);
-        setLoading(false);
-        return;
-      }
-
-      // Direkte Weiterleitung mit Template-Literal
+    if (user && authData.session) {
+      // Der Auth-Trigger legt das Kundenprofil atomar an. Ein zweiter Write ist
+      // nicht nötig und würde bei aktivierter E-Mail-Bestätigung an RLS scheitern.
       router.push(`/client/${user.id}/dashboard`);
+    } else if (user) {
+      setErrorMessage('Konto erstellt. Bitte bestätige zuerst deine E-Mail-Adresse und melde dich danach an.');
+      setLoading(false);
     } else {
       setErrorMessage('Registrierung fehlgeschlagen.');
       setLoading(false);

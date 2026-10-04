@@ -4,22 +4,12 @@ import { useEffect, useState } from 'react';
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
 import { supabase } from '@/app/lib/supabase';
-
-// Exportierte Liste der Spezialisierungen / Quiz-Kategorien
-export const AVAILABLE_SPECIALTIES = [
-  'Gewichtsverlust',
-  'Muskelaufbau',
-  'Body-Transformation',
-  'Mobilität',
-  'Functional Fitness',
-  'Krafttraining',
-  'Ernährungsberatung',
-  'Rehabilitation'
-];
+import { QUIZ_GOAL_BLOCKS } from '@/lib/constants';
 
 type Trainer = {
   id: string;
   name: string;
+  avatar_url?: string;
   bio: string;
   status: string;
   package_category?: string;
@@ -37,25 +27,6 @@ type QuizAnswers = {
   budget: string;
 };
 
-const MASTER_GOAL_BLOCKS = [
-  {
-    category: "Hypertrophie & Muskelaufbau",
-    items: ["Muskelaufbau", "Hypertrophie", "Krafttraining", "Bodybuilding"]
-  },
-  {
-    category: "Gewichtsverlust & Transformation",
-    items: ["Gewichtsverlust", "Abnehmen", "Fettabbau", "Body-Transformation", "Ernährungsberatung"]
-  },
-  {
-    category: "Gesundheit & Prävention",
-    items: ["Rückentraining", "Reha", "Rehabilitation", "Haltung", "Schmerzprävention", "Mobilität"]
-  },
-  {
-    category: "Performance & Athletik",
-    items: ["Leistungsdiagnostik", "Athletiktraining", "Ausdauer", "Functional Fitness"]
-  }
-];
-
 export default function QuizPage() {
   const router = useRouter();
   const [trainers, setTrainers] = useState<Trainer[]>([]);
@@ -71,9 +42,6 @@ export default function QuizPage() {
   });
 
   const [filteredResults, setFilteredResults] = useState<Trainer[]>([]);
-  const [selectedTrainer, setSelectedTrainer] = useState<any>(null);
-  const [trainerSlots, setTrainerSlots] = useState<any[]>([]);
-  const [bookingMessage, setBookingMessage] = useState('');
 
   const [activeTrainerKeywords, setActiveTrainerKeywords] = useState<string[]>([]);
   
@@ -85,7 +53,7 @@ export default function QuizPage() {
       setLoading(true);
       const { data, error } = await supabase
         .from('trainers')
-        .select('*')
+        .select('id, name, bio, status, avatar_url, city, service_mode, specialties, package_category, package_duration, package_price')
         .eq('status', 'approved');
 
       if (error) {
@@ -257,39 +225,6 @@ export default function QuizPage() {
     setView('quiz');
   };
 
-  async function openBookingModal(trainer: any) {
-    setSelectedTrainer(trainer);
-    setBookingMessage('');
-    const { data } = await supabase
-      .from('trainer_slots')
-      .select('*')
-      .eq('trainer_id', trainer.id)
-      .eq('status', 'free')
-      .order('slot_date', { ascending: true });
-    
-    setTrainerSlots(data || []);
-  }
-
-  async function handleBookSlot(slot: any) {
-    const response = await fetch('/api/checkout', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({
-        slotId: slot.id,
-        title: slot.title,
-        price: slot.price,
-        trainerName: selectedTrainer.name,
-      }),
-    });
-
-    const data = await response.json();
-    if (data.url) {
-      window.location.assign(data.url);
-    } else {
-      setBookingMessage('Fehler beim Starten des Checkouts: ' + data.error);
-    }
-  }
-
   return (
     <main className="min-h-screen bg-slate-950 text-white flex flex-col justify-between">
       <header className="flex justify-between items-center px-6 py-6 max-w-7xl mx-auto w-full">
@@ -350,7 +285,7 @@ export default function QuizPage() {
 
             {step === 2 && (
               <div className="space-y-6 max-w-xl mx-auto w-full pt-2">
-                {MASTER_GOAL_BLOCKS.map((block) => (
+                {QUIZ_GOAL_BLOCKS.map((block) => (
                   <div key={block.category} className="space-y-2">
                     <h3 className="text-xs font-bold uppercase tracking-wider text-slate-500 px-1">
                       {block.category}
@@ -471,8 +406,13 @@ export default function QuizPage() {
                 {filteredResults.map((trainer) => (
                   <div key={trainer.id} className="bg-slate-900 border border-slate-800 rounded-2xl p-6 flex flex-col justify-between space-y-6 shadow-xl">
                     <div className="space-y-3">
-                      <div className="flex justify-between items-start">
-                        <h3 className="text-xl font-bold">{trainer.name}</h3>
+                      <div className="flex justify-between items-start gap-3">
+                        <div className="flex items-center gap-3">
+                          <div className="w-12 h-12 rounded-xl overflow-hidden bg-slate-800 border border-slate-700 flex items-center justify-center text-lg font-bold text-emerald-400 shrink-0">
+                            {trainer.avatar_url ? <img src={trainer.avatar_url} alt="" className="w-full h-full object-cover" /> : <span>{trainer.name?.charAt(0) || 'T'}</span>}
+                          </div>
+                          <h3 className="text-xl font-bold">{trainer.name}</h3>
+                        </div>
                         <span className="text-xs bg-emerald-500/10 text-emerald-400 border border-emerald-500/20 px-2.5 py-1 rounded-full font-medium">
                           Verifiziert ✓
                         </span>
@@ -493,16 +433,10 @@ export default function QuizPage() {
                     <div className="flex items-center gap-3 pt-2">
                       <Link
                         href={`/trainer/${trainer.id}`}
-                        className="flex-1 bg-slate-800 hover:bg-slate-700 text-center font-semibold py-2.5 rounded-xl text-xs transition border border-slate-700"
+                        className="flex-1 bg-emerald-500 hover:bg-emerald-600 text-slate-950 text-center font-bold py-2.5 rounded-xl text-xs transition"
                       >
-                        Profil ansehen
+                        Profil & Angebote ansehen
                       </Link>
-                      <button
-                        onClick={() => openBookingModal(trainer)}
-                        className="bg-emerald-500 hover:bg-emerald-600 text-slate-950 font-bold px-4 py-2.5 rounded-xl text-xs transition cursor-pointer text-center"
-                      >
-                        Slots ansehen & Buchen
-                      </button>
                     </div>
                   </div>
                 ))}
@@ -512,49 +446,9 @@ export default function QuizPage() {
         )}
       </section>
 
-      {selectedTrainer && (
-        <div className="fixed inset-0 bg-black/80 backdrop-blur-sm flex items-center justify-center p-4 z-50">
-          <div className="bg-slate-900 border border-slate-800 rounded-2xl max-w-md w-full p-6 space-y-4 shadow-2xl">
-            <div className="flex justify-between items-center">
-              <h3 className="text-lg font-bold">Termin bei {selectedTrainer.name}</h3>
-              <button onClick={() => setSelectedTrainer(null)} className="text-slate-400 hover:text-white text-lg cursor-pointer">&times;</button>
-            </div>
-            {bookingMessage && (
-              <div className="p-3 bg-emerald-500/10 border border-emerald-500/30 text-emerald-400 text-xs rounded-xl">
-                {bookingMessage}
-              </div>
-            )}
-            <div className="space-y-2 max-h-60 overflow-y-auto">
-              <h4 className="text-xs font-semibold uppercase tracking-wider text-slate-400">Verfügbare Slots:</h4>
-              {trainerSlots.length === 0 ? (
-                <p className="text-xs text-slate-500">Derzeit keine freien Slots verfügbar.</p>
-              ) : (
-                renderSlotsList(trainerSlots, handleBookSlot)
-              )}
-            </div>
-          </div>
-        </div>
-      )}
-
       <footer className="border-t border-slate-900 py-6 text-center text-xs text-slate-600 max-w-7xl mx-auto w-full">
         &copy; {new Date().getFullYear()} VeriFit. Alle Rechte vorbehalten.
       </footer>
     </main>
   );
-}
-
-function renderSlotsList(trainerSlots: any[], handleBookSlot: (slot: any) => void) {
-  return trainerSlots.map((slot) => (
-    <div key={slot.id} className="flex justify-between items-center bg-slate-950 p-3 rounded-xl border border-slate-800 text-xs">
-      <div>
-        <div className="font-bold">{slot.title}</div>
-        <div className="text-slate-400">
-          {slot.slot_date} um {slot.slot_time ? slot.slot_time.slice(0, 5) : '--:--'} Uhr • {slot.price}€
-        </div>
-      </div>
-      <button onClick={() => handleBookSlot(slot)} className="bg-emerald-500 hover:bg-emerald-600 text-slate-950 px-3 py-1.5 rounded-lg font-bold text-xs cursor-pointer">
-        Bezahlen & Buchen
-      </button>
-    </div>
-  ));
 }

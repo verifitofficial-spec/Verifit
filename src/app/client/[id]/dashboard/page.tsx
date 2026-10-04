@@ -16,6 +16,17 @@ type TrackingEntry = {
   mood: number | null;
 };
 
+type ClientBooking = {
+  id: string;
+  offer_title: string | null;
+  offer_type: 'discovery' | 'paid';
+  price: number | string | null;
+  slot_date: string;
+  slot_time: string | null;
+  status: 'pending' | 'accepted' | 'confirmed' | 'declined' | 'cancelled' | 'expired';
+  payment_due_at: string | null;
+};
+
 type NutritionPlan = {
   id: string;
   day_of_week?: string;
@@ -44,6 +55,15 @@ type WorkoutPlan = {
   [key: string]: any;
 };
 
+type StoredPlanContent = {
+  days?: Array<{
+    templateName?: string;
+    meals?: Array<{ title?: string; items?: Array<{ name?: string; grams?: string; foodSearchInput?: string }> }>;
+    exercises?: Array<{ exercise?: string; sets?: string; reps?: string; weight?: string }>;
+  }>;
+  schedule?: Record<string, string>;
+};
+
 const DAYS_OF_WEEK = ['Montag', 'Dienstag', 'Mittwoch', 'Donnerstag', 'Freitag', 'Samstag', 'Sonntag'];
 
 export default function ClientDashboard({ params }: { params: Promise<{ id: string }> }) {
@@ -51,7 +71,7 @@ export default function ClientDashboard({ params }: { params: Promise<{ id: stri
   const clientId = resolvedParams.id;
 
   const [client, setClient] = useState<any>(null);
-  const [mySlots, setMySlots] = useState<any[]>([]);
+  const [bookings, setBookings] = useState<ClientBooking[]>([]);
   const [loading, setLoading] = useState(true);
   
   // Tracking States
@@ -86,6 +106,12 @@ export default function ClientDashboard({ params }: { params: Promise<{ id: stri
 
   useEffect(() => {
     async function loadClientData() {
+      const { data: { user } } = await supabase.auth.getUser();
+      if (!user || user.id !== clientId) {
+        router.push('/client/login');
+        return;
+      }
+
       const { data: clientData, error: clientError } = await supabase
         .from('clients')
         .select('*')
@@ -107,25 +133,29 @@ export default function ClientDashboard({ params }: { params: Promise<{ id: stri
       setProfileGoal(clientData.goal || 'muscle_gain');
       setProfileActivity(clientData.activity_level ? String(clientData.activity_level) : '1.55');
 
-      loadClientSlots(clientData.email);
+      loadBookings(clientData.id);
       loadTrackingHistory(clientData.id);
-      loadPlans(clientData.email, clientData.id);
+      loadPlans(clientData.id);
       setLoading(false);
     }
 
     loadClientData();
   }, [clientId, router]);
 
-  async function loadClientSlots(clientEmail: string) {
-    const { data } = await supabase
-      .from('trainer_slots')
-      .select('*, trainers(name, city, service_mode)')
-      .eq('client_email', clientEmail)
-      .order('slot_date', { ascending: true });
+  async function loadBookings(cId: string) {
+    const { data, error } = await supabase
+      .from('bookings')
+      .select('id, offer_title, offer_type, price, slot_date, slot_time, status, payment_due_at')
+      .eq('client_id', cId)
+      .order('slot_date', { ascending: true })
+      .order('slot_time', { ascending: true });
 
-    if (data) {
-      setMySlots(data);
+    if (error) {
+      console.error('Buchungen konnten nicht geladen werden:', error.message);
+      return;
     }
+
+    setBookings((data ?? []) as ClientBooking[]);
   }
 
   async function loadTrackingHistory(cId: string) {
@@ -147,11 +177,11 @@ export default function ClientDashboard({ params }: { params: Promise<{ id: stri
     }
   }
 
-  async function loadPlans(clientEmail: string, clientId?: string) {
+  async function loadPlans(userId: string) {
     const { data, error } = await supabase
       .from('client_plans')
-      .select('*')
-      .or(`client_email.eq.${clientEmail},client_id.eq.${clientId}`)
+      .select('id, plan_type, title, content, created_at')
+      .eq('user_id', userId)
       .order('created_at', { ascending: false });
 
     if (error) {
@@ -159,17 +189,33 @@ export default function ClientDashboard({ params }: { params: Promise<{ id: stri
       return;
     }
 
-    if (data) {
-      const workout = data.filter(
-        (p) => p.type === 'workout' || p.plan_type === 'workout'
-      );
-      const nutrition = data.filter(
-        (p) => p.type === 'nutrition' || p.plan_type === 'nutrition'
-      );
-
-      setWorkoutPlans(workout);
-      setNutritionPlans(nutrition);
+    const workout: WorkoutPlan[] = [];
+    const nutrition: NutritionPlan[] = [];
+    for (const plan of data ?? []) {
+      let content: StoredPlanContent;
+      try {
+        content = JSON.parse(plan.content) as StoredPlanContent;
+      } catch {
+        continue;
+      }
+      for (const [dateStr, templateName] of Object.entries(content.schedule ?? {})) {
+        const template = (content.days ?? []).find((day) => day.templateName === templateName);
+        if (!template) continue;
+        const dayOfWeek = new Intl.DateTimeFormat('de-DE', { weekday: 'long' }).format(new Date(`${dateStr}T12:00:00`));
+        if (plan.plan_type === 'workout') {
+          for (const [index, exercise] of (template.exercises ?? []).entries()) {
+            workout.push({ id: `${plan.id}-${dateStr}-${index}`, day_of_week: dayOfWeek, exercise_name: exercise.exercise, sets: Number(exercise.sets) || null, reps: exercise.reps, weight: Number(exercise.weight) || null });
+          }
+        } else if (plan.plan_type === 'nutrition') {
+          for (const [index, meal] of (template.meals ?? []).entries()) {
+            const items = (meal.items ?? []).map((item) => `${item.name || item.foodSearchInput || 'Lebensmittel'}${item.grams ? ` (${item.grams} g)` : ''}`).join(', ');
+            nutrition.push({ id: `${plan.id}-${dateStr}-${index}`, day_of_week: dayOfWeek, meal_title: meal.title, description: items || null });
+          }
+        }
+      }
     }
+    setWorkoutPlans(workout);
+    setNutritionPlans(nutrition);
   }
 
   // Speichern der Körperdaten & Freigabe
@@ -259,19 +305,53 @@ export default function ClientDashboard({ params }: { params: Promise<{ id: stri
     }
   }
 
-  async function handleCancelSlot(slotId: string) {
-    const { error } = await supabase
-      .from('trainer_slots')
-      .update({
-        status: 'free',
-        client_name: null,
-        client_email: null,
-      })
-      .eq('id', slotId);
-
-    if (!error && client) {
-      loadClientSlots(client.email);
+  async function handleCheckout(bookingId: string) {
+    const { data: { session } } = await supabase.auth.getSession();
+    if (!session) {
+      router.push('/client/login');
+      return;
     }
+
+    try {
+      const response = await fetch('/api/checkout', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          Authorization: `Bearer ${session.access_token}`,
+        },
+        body: JSON.stringify({ bookingId }),
+      });
+      const data = (await response.json().catch(() => ({}))) as { error?: string; url?: string };
+
+      if (!response.ok || !data.url) {
+        alert(data.error || 'Checkout konnte nicht gestartet werden.');
+        return;
+      }
+
+      window.location.assign(data.url);
+    } catch {
+      alert('Netzwerkfehler beim Starten des Checkouts.');
+    }
+  }
+
+  async function handleCancelBooking(bookingId: string) {
+    if (!window.confirm('Möchtest du diese Buchungsanfrage wirklich stornieren?')) return;
+    const { data: { session } } = await supabase.auth.getSession();
+    if (!session) {
+      alert('Deine Sitzung ist abgelaufen. Bitte melde dich erneut an.');
+      return;
+    }
+    const response = await fetch('/api/cancel-booking', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${session.access_token}` },
+      body: JSON.stringify({ bookingId }),
+    });
+    const result = (await response.json().catch(() => ({}))) as { error?: string };
+    if (!response.ok) {
+      alert(result.error || 'Buchung konnte nicht storniert werden.');
+      return;
+    }
+    await loadBookings(clientId);
   }
 
   async function handleLogout() {
@@ -331,39 +411,68 @@ export default function ClientDashboard({ params }: { params: Promise<{ id: stri
           </div>
 
           <div className="space-y-4">
-            <h2 className="text-lg font-bold">Deine gebuchten Termine</h2>
-            {mySlots.length === 0 ? (
+            <h2 className="text-lg font-bold">Deine Buchungen</h2>
+            {bookings.length === 0 ? (
               <p className="text-xs text-slate-500">Du hast bisher keine Termine angefragt.</p>
             ) : (
               <div className="space-y-3">
-                {mySlots.map((slot) => {
+                {bookings.map((booking) => {
                   let badge = 'bg-amber-500/10 text-amber-400 border-amber-500/20';
                   let statusText = 'Anfrage ausstehend (Wartet auf Bestätigung)';
-                  if (slot.status === 'confirmed') {
+                  if (booking.status === 'accepted') {
                     badge = 'bg-blue-500/10 text-blue-400 border-blue-500/20';
-                    statusText = 'Vom Trainer bestätigt ✓';
+                    statusText = 'Vom Trainer angenommen – Zahlung ausstehend';
+                  } else if (booking.status === 'confirmed') {
+                    badge = 'bg-emerald-500/10 text-emerald-400 border-emerald-500/20';
+                    statusText = 'Verbindlich bestätigt ✓';
+                  } else if (booking.status === 'declined') {
+                    badge = 'bg-red-500/10 text-red-400 border-red-500/20';
+                    statusText = 'Abgelehnt';
+                  } else if (booking.status === 'expired') {
+                    badge = 'bg-slate-800 text-slate-400 border-slate-700';
+                    statusText = 'Zahlungsfrist abgelaufen';
+                  } else if (booking.status === 'cancelled') {
+                    badge = 'bg-slate-800 text-slate-400 border-slate-700';
+                    statusText = 'Storniert';
                   }
 
                   return (
-                    <div key={slot.id} className="bg-slate-950 p-5 rounded-2xl border border-slate-800 flex flex-col md:flex-row justify-between items-start md:items-center gap-4">
+                    <div key={booking.id} className="bg-slate-950 p-5 rounded-2xl border border-slate-800 flex flex-col md:flex-row justify-between items-start md:items-center gap-4">
                       <div>
                         <div className="flex items-center gap-2 mb-1">
-                          <span className="font-bold text-white text-sm">{slot.title}</span>
+                          <span className="font-bold text-white text-sm">{booking.offer_title || 'Trainingseinheit'}</span>
                           <span className={`text-[10px] px-2.5 py-0.5 rounded-full border ${badge}`}>
                             {statusText}
                           </span>
                         </div>
                         <p className="text-xs text-slate-400">
-                          Trainer: <strong className="text-slate-200">{slot.trainers?.name}</strong> &bull; {slot.slot_date} um {slot.slot_time} Uhr
+                          {booking.slot_date} um {booking.slot_time?.slice(0, 5) || '--:--'} Uhr
                         </p>
+                        {booking.status === 'accepted' && booking.payment_due_at && (
+                          <p className="text-xs text-amber-400 mt-1">
+                            Zahlung bis {new Date(booking.payment_due_at).toLocaleString('de-DE')} Uhr
+                          </p>
+                        )}
                       </div>
 
-                      <button
-                        onClick={() => handleCancelSlot(slot.id)}
-                        className="text-xs text-red-400 hover:text-red-300 px-3 py-2 bg-red-500/10 rounded-xl border border-red-500/20 cursor-pointer"
-                      >
-                        Termin absagen
-                      </button>
+                      <div className="flex items-center gap-2">
+                        {booking.status === 'accepted' && Number(booking.price) > 0 && (
+                          <button
+                            onClick={() => handleCheckout(booking.id)}
+                            className="text-xs bg-emerald-500 hover:bg-emerald-600 text-slate-950 font-bold px-4 py-2 rounded-xl cursor-pointer"
+                          >
+                            Jetzt bezahlen
+                          </button>
+                        )}
+                        {['pending', 'accepted'].includes(booking.status) && (
+                          <button
+                            onClick={() => handleCancelBooking(booking.id)}
+                            className="text-xs bg-slate-800 hover:bg-slate-700 border border-slate-700 text-slate-300 font-bold px-3 py-2 rounded-xl cursor-pointer"
+                          >
+                            Stornieren
+                          </button>
+                        )}
+                      </div>
                     </div>
                   );
                 })}

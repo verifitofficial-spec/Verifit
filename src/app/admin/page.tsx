@@ -36,8 +36,31 @@ type Trainer = {
   availability_status?: string;
 };
 
+type AdminApiResponse = {
+  error?: string;
+  signedUrl?: string;
+  trainer?: {
+    id: string;
+    status: 'approved' | 'rejected';
+  };
+};
+
+type AdminBooking = {
+  id: string;
+  client_name: string | null;
+  client_email: string | null;
+  offer_title: string | null;
+  price: number | null;
+  status: string;
+  slot_date: string;
+  slot_time: string;
+  stripe_session_id: string | null;
+  refund_id: string | null;
+};
+
 export default function VerificationPage() {
   const [trainers, setTrainers] = useState<Trainer[]>([]);
+  const [bookings, setBookings] = useState<AdminBooking[]>([]);
   const [loading, setLoading] = useState(true);
   const router = useRouter();
 
@@ -55,6 +78,16 @@ export default function VerificationPage() {
       setTrainers(data || []);
     }
     setLoading(false);
+  }, []);
+
+  const fetchBookings = useCallback(async () => {
+    const { data, error } = await supabase
+      .from('bookings')
+      .select('id, client_name, client_email, offer_title, price, status, slot_date, slot_time, stripe_session_id, refund_id')
+      .order('created_at', { ascending: false })
+      .limit(100);
+    if (error) console.error('Fehler beim Laden der Buchungen:', error.message);
+    else setBookings((data ?? []) as AdminBooking[]);
   }, []);
 
   // Sicherheitsprüfung und Laden der Trainer beim Start der Seite
@@ -80,42 +113,71 @@ export default function VerificationPage() {
         return;
       }
 
-      fetchTrainers();
+      await Promise.all([fetchTrainers(), fetchBookings()]);
     }
 
     checkAdminSession();
-  }, [router, fetchTrainers]);
+  }, [router, fetchTrainers, fetchBookings]);
 
-  // Signed URL generieren & PDF-Dokument in neuem Tab öffnen
+  // Signed URL nur nach serverseitiger Admin-Prüfung generieren & PDF-Dokument in neuem Tab öffnen
   async function handleViewDocument(path: string) {
     if (!path) return;
 
-    const { data, error } = await supabase.storage
-      .from('verification-docs')
-      .createSignedUrl(path, 60); // Link ist 60 Sekunden gültig
+    const {
+      data: { session },
+    } = await supabase.auth.getSession();
 
-    if (error || !data) {
-      alert('Dokument konnte nicht geöffnet werden: ' + (error?.message || 'Fehler beim Erstellen des Links'));
+    if (!session) {
+      alert('Deine Sitzung ist abgelaufen. Bitte melde dich erneut an.');
       return;
     }
 
-    window.open(data.signedUrl, '_blank');
+    const response = await fetch('/api/admin/verification-document', {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        Authorization: `Bearer ${session.access_token}`,
+      },
+      body: JSON.stringify({ path }),
+    });
+    const data = (await response.json().catch(() => ({}))) as AdminApiResponse;
+
+    if (!response.ok || !data.signedUrl) {
+      alert('Dokument konnte nicht geöffnet werden: ' + (data.error || 'Fehler beim Erstellen des Links'));
+      return;
+    }
+
+    window.open(data.signedUrl, '_blank', 'noopener,noreferrer');
   }
 
   // Status eines Trainers aktualisieren (z.B. 'approved' oder 'rejected')
   async function updateTrainerStatus(id: string, newStatus: 'approved' | 'rejected') {
-    const { error } = await supabase
-      .from('trainers')
-      .update({ status: newStatus })
-      .eq('id', id);
+    const {
+      data: { session },
+    } = await supabase.auth.getSession();
 
-    if (error) {
-      console.error('Fehler beim Aktualisieren des Status:', error.message);
-      alert('Fehler beim Speichern.');
+    if (!session) {
+      alert('Deine Sitzung ist abgelaufen. Bitte melde dich erneut an.');
+      return;
+    }
+
+    const response = await fetch('/api/admin/trainer-status', {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        Authorization: `Bearer ${session.access_token}`,
+      },
+      body: JSON.stringify({ trainerId: id, status: newStatus }),
+    });
+    const data = (await response.json().catch(() => ({}))) as AdminApiResponse;
+
+    if (!response.ok || !data.trainer) {
+      console.error('Trainerstatus konnte nicht aktualisiert werden');
+      alert(data.error || 'Fehler beim Speichern.');
     } else {
       // Liste lokal aktualisieren, damit die UI sofort reagiert
       setTrainers(prev =>
-        prev.map(t => (t.id === id ? { ...t, status: newStatus } : t))
+        prev.map(t => (t.id === data.trainer?.id ? { ...t, status: data.trainer.status } : t))
       );
     }
   }
@@ -160,6 +222,35 @@ export default function VerificationPage() {
         <p className="text-slate-400 text-xs">
           Jeder Trainer auf VeriFit wird manuell geprüft: Lizenz-PDFs, Haftpflichtversicherung, Stammdaten und fachliche Qualifikation.
         </p>
+
+        <section className="bg-slate-900 border border-slate-800 rounded-2xl p-5 space-y-4">
+          <div className="flex items-center justify-between">
+            <div>
+              <h2 className="text-base font-bold text-white">Buchungen & Zahlungen</h2>
+              <p className="text-xs text-slate-500">Die letzten 100 Buchungen im Staging-Testmodus.</p>
+            </div>
+            <span className="text-xs text-slate-400">{bookings.length} Einträge</span>
+          </div>
+          {bookings.length === 0 ? (
+            <p className="text-xs text-slate-500">Noch keine Buchungen vorhanden.</p>
+          ) : (
+            <div className="space-y-2">
+              {bookings.map((booking) => (
+                <div key={booking.id} className="bg-slate-950 border border-slate-800 rounded-xl p-3 flex flex-col md:flex-row md:items-center md:justify-between gap-2 text-xs">
+                  <div>
+                    <p className="font-semibold text-white">{booking.offer_title || 'Trainingseinheit'} · {booking.client_name || booking.client_email || 'Kunde'}</p>
+                    <p className="text-slate-500">{booking.slot_date} · {booking.slot_time?.slice(0, 5)} Uhr · {Number(booking.price || 0).toFixed(2)} €</p>
+                  </div>
+                  <div className="flex items-center gap-2">
+                    <span className="px-2 py-1 rounded-lg bg-slate-900 text-slate-300 border border-slate-700">{booking.status}</span>
+                    {booking.refund_id && <span className="px-2 py-1 rounded-lg bg-amber-500/10 text-amber-300 border border-amber-500/20">erstattet</span>}
+                    {booking.stripe_session_id && <span className="text-slate-500">Stripe</span>}
+                  </div>
+                </div>
+              ))}
+            </div>
+          )}
+        </section>
 
         {loading ? (
           <div className="flex items-center justify-center py-16">

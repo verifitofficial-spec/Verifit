@@ -7,7 +7,7 @@ VeriFit ist eine Vermittlungsplattform für verifizierte Personal Trainer (DACH-
 - **Framework:** Next.js 16 (App Router), React 19, TypeScript (strict mode)
 - **Styling:** Tailwind CSS v4 (`@tailwindcss/postcss`), kein separates `tailwind.config` nötig
 - **Backend:** Supabase (Postgres, Auth, Storage, Realtime) — Client in `src/app/lib/supabase.ts`
-- **Zahlungen:** Stripe Checkout Sessions (`src/app/api/checkout/route.ts`) + Webhook (`src/app/api/webhook/route.ts`)
+- Checkout läuft über Stripe Checkout Sessions (`src/app/api/checkout/route.ts`) + strikt signierten Webhook (`src/app/api/webhook/route.ts`); Buchungen nutzen `{ slotId, offerId }` und den Bearer-Token.
 - **E-Mail:** Resend (`src/app/lib/resend.ts`), Transaktions-Mails in `src/app/send-email/route.ts`
 - **Icons:** lucide-react
 
@@ -31,7 +31,7 @@ Kern-Tabellen: `profiles`, `trainers`, `clients`, `trainer_slots`, `client_plans
 
 ## Zahlungen & Buchungsablauf
 
-Checkout läuft über Stripe Checkout Sessions mit `slotId` in den Metadaten; der Webhook markiert den Slot nach `checkout.session.completed` als `booked` und verschickt eine Bestätigungsmail. Es gibt daneben einen unbezahlten Anfrage-Flow (`status: 'pending'`) für Discovery Calls. Details, Statuswerte und Edge Cases: @docs/payment-flow.md
+Ein Kunde fragt ein aktives Angebot mit einem freien Slot über `/api/book-slot` an. Der Server liest Preis, Kundendaten und Trainerstatus aus Staging. Trainerantworten laufen über `respond_to_booking`; bezahlte Buchungen werden im Kundenportal über `/api/checkout` bezahlt. `cancel_booking` und der Verfallsjob geben nicht bezahlte Anfragen serverseitig frei. Details: @docs/payment-flow.md
 
 ## Konventionen für neue Features
 

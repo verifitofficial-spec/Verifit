@@ -19,6 +19,24 @@ export default function Chat({ currentUserId }: ChatProps) {
     async function loadContacts() {
       setLoadingContacts(true);
 
+      const [{ data: bookingRows }, { data: messageRows }] = await Promise.all([
+        supabase
+          .from('bookings')
+          .select('client_id, trainer_id')
+          .or(`client_id.eq.${currentUserId},trainer_id.eq.${currentUserId}`),
+        supabase
+          .from('messages')
+          .select('sender_id, receiver_id')
+          .or(`sender_id.eq.${currentUserId},receiver_id.eq.${currentUserId}`),
+      ]);
+      const contactIds = new Set<string>();
+      for (const booking of bookingRows ?? []) {
+        contactIds.add(booking.client_id === currentUserId ? booking.trainer_id : booking.client_id);
+      }
+      for (const message of messageRows ?? []) {
+        contactIds.add(message.sender_id === currentUserId ? message.receiver_id : message.sender_id);
+      }
+
       // 1. Prüfen, ob der aktuelle Nutzer ein Trainer ist
       const { data: trainerCheck } = await supabase
         .from('trainers')
@@ -31,13 +49,13 @@ export default function Chat({ currentUserId }: ChatProps) {
         const { data: clientsData } = await supabase
           .from('clients')
           .select('id, name, email');
-        if (clientsData) setContacts(clientsData);
+        if (clientsData) setContacts(clientsData.filter((client) => contactIds.has(client.id)));
       } else {
         // Nutzer ist Kunde -> Lade Trainer
         const { data: trainersData } = await supabase
           .from('trainers')
           .select('id, name, email');
-        if (trainersData) setContacts(trainersData);
+        if (trainersData) setContacts(trainersData.filter((trainer) => contactIds.has(trainer.id)));
       }
 
       setLoadingContacts(false);

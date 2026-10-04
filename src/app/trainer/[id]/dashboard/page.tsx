@@ -5,6 +5,7 @@ import { useRouter } from 'next/navigation';
 import Link from 'next/link';
 import { supabase } from '@/app/lib/supabase';
 import Chat from '@/components/Chat';
+import { AVAILABLE_SPECIALTIES } from '@/lib/constants';
 import { 
   Calendar as CalendarIcon, 
   Clock, 
@@ -21,33 +22,6 @@ import {
   Dumbbell,
   Utensils
 } from 'lucide-react';
-
-const AVAILABLE_SPECIALTIES = [
-  'Athletiktraining',
-  'Ernährungsberatung',
-  'Fettabbau',
-  'Functional Training',
-  'Gewichtsmanagement',
-  'Ganzkörpertraining',
-  'Gesundheitsorientiertes Krafttraining',
-  'HIIT & Cardio',
-  'Hypertrophie',
-  'Körperhaltung & Core',
-  'Leistungsdiagnostik',
-  'Lauftraining & Ausdauer',
-  'Mobility & Stretching',
-  'Muskelaufbau',
-  'Postnatales Training',
-  'Pränatales Training',
-  'Reha & Prävention',
-  'Rückentraining',
-  'Seniorenfitness',
-  'Stoffwechseloptimierung',
-  'Stressabbau & Entspannung',
-  'Sportartspezifisches Training',
-  'Transformation',
-  'Yogalates & Core'
-].sort((a, b) => a.localeCompare(b, 'de'));
 
 const EXERCISE_OPTIONS = [
   'Langhantel-Bankdrücken',
@@ -174,8 +148,18 @@ interface Booking {
   created_at: string;
 }
 
+interface TrainerProfile {
+  id: string;
+  name: string | null;
+  bio: string | null;
+  email: string | null;
+  status: string | null;
+  avatar_url: string | null;
+  [key: string]: unknown;
+}
+
 export default function TrainerDashboard() {
-  const [trainer, setTrainer] = useState<any>(null);
+  const [trainer, setTrainer] = useState<TrainerProfile | null>(null);
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
   const [message, setMessage] = useState('');
@@ -184,14 +168,14 @@ export default function TrainerDashboard() {
   const [name, setName] = useState('');
   const [bio, setBio] = useState('');
   const [city, setCity] = useState('');
-  const [serviceMode, setServiceMode] = useState('Vor Ort & Online');
+  const [serviceMode, setServiceMode] = useState('');
   const [selectedSpecialties, setSelectedSpecialties] = useState<string[]>([]);
   const [licenseNumber, setLicenseNumber] = useState('');
   const [insuranceExpiry, setInsuranceExpiry] = useState('');
   const [packageCategory, setPackageCategory] = useState('');
   const [packageDuration, setPackageDuration] = useState('');
   const [packagePrice, setPackagePrice] = useState('');
-  const [availabilityStatus, setAvailabilityStatus] = useState('available');
+  const [availabilityStatus, setAvailabilityStatus] = useState('');
 
   // PDF Dokumentspfade & Upload States
   const [licenseDocPath, setLicenseDocPath] = useState('');
@@ -199,6 +183,9 @@ export default function TrainerDashboard() {
   const [uploadingLicense, setUploadingLicense] = useState(false);
   const [uploadingInsurance, setUploadingInsurance] = useState(false);
   const [docMessage, setDocMessage] = useState('');
+  const [uploadingAvatar, setUploadingAvatar] = useState(false);
+  const [stripeLoading, setStripeLoading] = useState(false);
+  const [stripeMessage, setStripeMessage] = useState('');
 
   const todayObj = new Date();
   const [currentYear, setCurrentYear] = useState(todayObj.getFullYear());
@@ -300,7 +287,7 @@ export default function TrainerDashboard() {
       const { data } = await supabase
         .from('trainers')
         .select('*')
-        .eq('email', user.email)
+        .eq('id', user.id)
         .single();
 
       if (data) {
@@ -308,7 +295,7 @@ export default function TrainerDashboard() {
         setName(data.name || '');
         setBio(data.bio || '');
         setCity(data.city || '');
-        setServiceMode(data.service_mode || 'Vor Ort & Online');
+        setServiceMode(data.service_mode || '');
         
         if (data.specialties) {
           setSelectedSpecialties(
@@ -321,7 +308,7 @@ export default function TrainerDashboard() {
         setPackageCategory(data.package_category || '');
         setPackageDuration(data.package_duration || '');
         setPackagePrice(data.package_price ? String(data.package_price) : '');
-        setAvailabilityStatus(data.availability_status || 'available');
+        setAvailabilityStatus(data.availability_status || '');
 
         // Dokumentpfade für Lizenz & Versicherung laden
         setLicenseDocPath(data.license_document_path || '');
@@ -384,6 +371,39 @@ export default function TrainerDashboard() {
       setDocMessage(type === 'license' ? 'Lizenz-PDF erfolgreich hochgeladen!' : 'Versicherungsnachweis erfolgreich hochgeladen!');
     }
     setUploading(false);
+  }
+
+  async function handleUploadAvatar(file: File) {
+    if (!trainer) return;
+    if (!['image/jpeg', 'image/png', 'image/webp'].includes(file.type)) {
+      setMessage('Fehler: Bitte JPG, PNG oder WebP auswählen.');
+      return;
+    }
+    if (file.size > 5 * 1024 * 1024) {
+      setMessage('Fehler: Das Profilbild darf maximal 5 MB groß sein.');
+      return;
+    }
+    setUploadingAvatar(true);
+    setMessage('');
+    const extension = file.type === 'image/png' ? 'png' : file.type === 'image/webp' ? 'webp' : 'jpg';
+    const path = `${trainer.id}/profile.${extension}`;
+    const { error: uploadError } = await supabase.storage.from('avatars').upload(path, file, {
+      contentType: file.type,
+      upsert: true,
+    });
+    if (uploadError) {
+      setMessage('Fehler beim Hochladen des Profilbilds: ' + uploadError.message);
+      setUploadingAvatar(false);
+      return;
+    }
+    const { data: publicUrl } = supabase.storage.from('avatars').getPublicUrl(path);
+    const { error: updateError } = await supabase.from('trainers').update({ avatar_url: publicUrl.publicUrl }).eq('id', trainer.id);
+    if (updateError) setMessage('Fehler beim Speichern des Profilbilds: ' + updateError.message);
+    else {
+      setTrainer({ ...trainer, avatar_url: publicUrl.publicUrl });
+      setMessage('Profilbild erfolgreich gespeichert.');
+    }
+    setUploadingAvatar(false);
   }
 
   async function handleDeleteDocument(type: 'license' | 'insurance') {
@@ -452,11 +472,23 @@ export default function TrainerDashboard() {
   }
 
   async function handleRespond(bookingId: string, accept: boolean) {
-    const { error } = await supabase.rpc('respond_to_booking', {
-      p_booking_id: bookingId,
-      p_accept: accept,
+    const { data: { session } } = await supabase.auth.getSession();
+    if (!session) {
+      alert('Deine Sitzung ist abgelaufen. Bitte melde dich erneut an.');
+      return;
+    }
+
+    const response = await fetch('/api/respond-booking', {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        Authorization: `Bearer ${session.access_token}`,
+      },
+      body: JSON.stringify({ bookingId, accept }),
     });
-    if (error) { alert(error.message); return; }
+
+    const data = (await response.json().catch(() => ({}))) as { error?: string };
+    if (!response.ok) { alert(data.error || 'Buchungsantwort konnte nicht gespeichert werden.'); return; }
     if (trainer) await Promise.all([loadBookings(trainer.id), loadSlots(trainer.id)]);
   }
 
@@ -1037,6 +1069,7 @@ export default function TrainerDashboard() {
 
   async function handleUpdate(e: React.FormEvent) {
     e.preventDefault();
+    if (!trainer) return;
     setSaving(true);
     setMessage('');
 
@@ -1075,6 +1108,25 @@ export default function TrainerDashboard() {
       }
     }
     setSaving(false);
+  }
+
+  async function handleStripeConnect() {
+    setStripeLoading(true);
+    setStripeMessage('');
+    const { data: sessionData } = await supabase.auth.getSession();
+    if (!sessionData.session) {
+      setStripeMessage('Sitzung abgelaufen. Bitte erneut anmelden.');
+      setStripeLoading(false);
+      return;
+    }
+    const response = await fetch('/api/stripe/connect-link', {
+      method: 'POST',
+      headers: { Authorization: `Bearer ${sessionData.session.access_token}` },
+    });
+    const result = (await response.json().catch(() => ({}))) as { url?: string; error?: string };
+    if (!response.ok || !result.url) setStripeMessage(result.error || 'Stripe-Onboarding konnte nicht gestartet werden.');
+    else window.location.assign(result.url);
+    setStripeLoading(false);
   }
 
   async function handleLogout() {
@@ -1153,6 +1205,18 @@ export default function TrainerDashboard() {
           )}
 
           <form onSubmit={handleUpdate} className="space-y-6">
+            <div className="flex flex-col sm:flex-row items-start sm:items-center gap-4 bg-slate-950/70 border border-slate-800 rounded-xl p-4">
+              <div className="w-20 h-20 rounded-2xl overflow-hidden bg-slate-800 border border-slate-700 flex items-center justify-center text-2xl font-bold text-emerald-400 shrink-0">
+                {trainer?.avatar_url ? <img src={trainer.avatar_url} alt="Aktuelles Profilbild" className="w-full h-full object-cover" /> : <span>{name?.charAt(0) || 'T'}</span>}
+              </div>
+              <div className="space-y-2">
+                <p className="text-xs text-slate-300">Dieses Bild wird nach dem Quiz und in der Trainerliste angezeigt.</p>
+                <label className="inline-flex items-center bg-slate-800 hover:bg-slate-700 border border-slate-700 text-emerald-400 px-3 py-2 rounded-xl text-xs font-semibold cursor-pointer">
+                  {uploadingAvatar ? 'Lade hoch...' : trainer?.avatar_url ? 'Profilbild ersetzen' : 'Profilbild hochladen'}
+                  <input type="file" accept="image/jpeg,image/png,image/webp" disabled={uploadingAvatar} onChange={(event) => { const file = event.target.files?.[0]; if (file) handleUploadAvatar(file); event.target.value = ''; }} className="hidden" />
+                </label>
+              </div>
+            </div>
             <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
               <div>
                 <label className="block text-xs font-semibold text-slate-400 uppercase tracking-wider mb-2">Vollständiger Name</label>
@@ -1194,6 +1258,22 @@ export default function TrainerDashboard() {
               {saving ? 'Speichere...' : 'Profil aktualisieren'}
             </button>
           </form>
+        </div>
+
+        <div className="bg-slate-900/60 backdrop-blur-md border border-slate-800/80 rounded-2xl p-6 sm:p-8 shadow-xl space-y-4">
+          <div className="flex items-center justify-between gap-4">
+            <div>
+              <h2 className="text-lg font-bold text-white">Stripe-Auszahlungen</h2>
+              <p className="text-slate-400 text-xs">Verbinde dein Stripe-Testkonto, damit bezahlte Buchungen später ausgezahlt werden können.</p>
+            </div>
+            <span className={`text-xs font-bold ${trainer?.charges_enabled ? 'text-emerald-400' : 'text-amber-400'}`}>
+              {trainer?.charges_enabled ? 'Aktiv' : 'Noch nicht eingerichtet'}
+            </span>
+          </div>
+          {stripeMessage && <div className="p-3 rounded-xl text-xs bg-red-500/10 border border-red-500/20 text-red-400">{stripeMessage}</div>}
+          <button type="button" onClick={handleStripeConnect} disabled={stripeLoading} className="bg-emerald-500 hover:bg-emerald-600 text-slate-950 font-bold px-4 py-2.5 rounded-xl text-xs disabled:opacity-60">
+            {stripeLoading ? 'Öffne Stripe...' : trainer?.stripe_account_id ? 'Stripe-Onboarding fortsetzen' : 'Stripe-Testkonto verbinden'}
+          </button>
         </div>
 
         {/* 2. Kompetenzgebiete */}
