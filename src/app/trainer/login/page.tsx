@@ -6,18 +6,23 @@ import Link from 'next/link';
 import { supabase } from '@/app/lib/supabase';
 import { loginSchema } from '@/app/lib/validation/authSchemas';
 import { FormFieldError } from '@/components/FormError';
+import { translateAuthError } from '@/lib/authErrors';
 
 export default function TrainerLoginPage() {
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [loading, setLoading] = useState(false);
   const [errorMessage, setErrorMessage] = useState('');
+  const [infoMessage, setInfoMessage] = useState('');
+  const [canResend, setCanResend] = useState(false);
   const [fieldErrors, setFieldErrors] = useState<{ email?: string; password?: string }>({});
   const router = useRouter();
 
   async function handleLogin(e: React.FormEvent) {
     e.preventDefault();
     setErrorMessage('');
+    setInfoMessage('');
+    setCanResend(false);
     setFieldErrors({});
 
     const result = loginSchema.safeParse({ email, password });
@@ -39,43 +44,66 @@ export default function TrainerLoginPage() {
     });
 
     if (error) {
-      setErrorMessage(error.message);
+      setErrorMessage(translateAuthError(error.message));
+      setCanResend(error.message.toLowerCase().includes('email not confirmed'));
       setLoading(false);
       return;
     }
 
     const user = data.user;
-    if (user) {
-      // Sicherheitsprüfung: Prüfen, ob der User laut zentraler profiles-Tabelle ein Trainer ist
-      const { data: profileData, error: profileError } = await supabase
-        .from('profiles')
-        .select('role')
-        .eq('id', user.id)
-        .single();
-
-      if (profileError || !profileData || profileData.role !== 'trainer') {
-        await supabase.auth.signOut();
-        setErrorMessage('Zugriff verwehrt. Dieser Account ist kein Trainer-Konto.');
-        setLoading(false);
-        return;
-      }
-
-      // Wir holen die echte Trainer-ID anhand der E-Mail aus der trainers-Tabelle
-      const { data: trainerData } = await supabase
-        .from('trainers')
-        .select('id')
-        .eq('email', user.email)
-        .single();
-
-      if (trainerData) {
-        router.push(`/trainer/${trainerData.id}/dashboard`);
-      } else {
-        setErrorMessage('Kein Trainer-Profil zu diesem Account gefunden.');
-        setLoading(false);
-      }
-    } else {
-      router.push('/trainer/list');
+    if (!user) {
+      setErrorMessage('Benutzer konnte nicht gefunden werden.');
+      setLoading(false);
+      return;
     }
+
+    const { data: profileData, error: profileError } = await supabase
+      .from('profiles')
+      .select('role')
+      .eq('id', user.id)
+      .maybeSingle();
+
+    if (profileError || !profileData) {
+      await supabase.auth.signOut();
+      setErrorMessage('Dein Profil konnte nicht geladen werden. Bitte versuche es erneut.');
+      setLoading(false);
+      return;
+    }
+
+    if (profileData.role !== 'trainer') {
+      await supabase.auth.signOut();
+      setErrorMessage(
+        profileData.role === 'client'
+          ? 'Dieser Account ist ein Kunden-Konto. Bitte nutze den Kunden-Login.'
+          : 'Dieser Account ist kein Trainer-Konto.'
+      );
+      setLoading(false);
+      return;
+    }
+
+    // Das Trainerprofil ist über die unveränderliche Auth-ID verknüpft.
+    const { data: trainerData } = await supabase.from('trainers').select('id').eq('id', user.id).maybeSingle();
+
+    if (!trainerData) {
+      await supabase.auth.signOut();
+      setErrorMessage('Zu diesem Account wurde kein Trainerprofil gefunden. Bitte kontaktiere den Support.');
+      setLoading(false);
+      return;
+    }
+
+    router.push(`/trainer/${trainerData.id}/dashboard`);
+  }
+
+  async function handleResend() {
+    setErrorMessage('');
+    setInfoMessage('');
+    const { error } = await supabase.auth.resend({
+      type: 'signup',
+      email: email.trim(),
+      options: { emailRedirectTo: `${window.location.origin}/trainer/login` },
+    });
+    if (error) setErrorMessage(translateAuthError(error.message));
+    else setInfoMessage('Wir haben dir eine neue Bestätigungs-E-Mail geschickt.');
   }
 
   return (
@@ -97,8 +125,18 @@ export default function TrainerLoginPage() {
           </div>
 
           {errorMessage && (
-            <div className="mb-4 p-3 bg-red-500/10 border border-red-500/20 rounded-xl text-red-400 text-xs">
-              {errorMessage}
+            <div className="mb-4 p-3 bg-red-500/10 border border-red-500/20 rounded-xl text-red-400 text-xs space-y-2">
+              <p>{errorMessage}</p>
+              {canResend && (
+                <button type="button" onClick={handleResend} className="underline text-red-300 cursor-pointer">
+                  Bestätigungs-E-Mail erneut senden
+                </button>
+              )}
+            </div>
+          )}
+          {infoMessage && (
+            <div className="mb-4 p-3 bg-emerald-500/10 border border-emerald-500/20 rounded-xl text-emerald-400 text-xs">
+              {infoMessage}
             </div>
           )}
 
@@ -109,6 +147,7 @@ export default function TrainerLoginPage() {
               </label>
               <input
                 type="email"
+                autoComplete="email"
                 placeholder="name@example.com"
                 value={email}
                 onChange={(e) => setEmail(e.target.value)}
@@ -125,6 +164,7 @@ export default function TrainerLoginPage() {
               </label>
               <input
                 type="password"
+                autoComplete="current-password"
                 placeholder="••••••••"
                 value={password}
                 onChange={(e) => setPassword(e.target.value)}
@@ -133,6 +173,11 @@ export default function TrainerLoginPage() {
                 }`}
               />
               <FormFieldError message={fieldErrors.password} />
+              <div className="text-right mt-2">
+                <Link href="/forgot-password" className="text-xs text-slate-400 hover:text-emerald-400 transition">
+                  Passwort vergessen?
+                </Link>
+              </div>
             </div>
 
             <button

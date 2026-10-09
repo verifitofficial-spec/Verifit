@@ -1,6 +1,12 @@
-import Link from 'next/link';
+'use client';
 
-export default function LoginSelectionPage() {
+import { Suspense } from 'react';
+import Link from 'next/link';
+import { useNextParam, withNext } from '@/lib/nextParam';
+
+function LoginSelection() {
+  const next = useNextParam();
+
   return (
     <main className="min-h-screen bg-slate-950 text-white flex flex-col justify-between">
       <header className="flex justify-between items-center px-6 py-6 max-w-7xl mx-auto w-full">
@@ -21,7 +27,7 @@ export default function LoginSelectionPage() {
 
           <div className="space-y-4">
             <Link
-              href="/client/login"
+              href={withNext('/client/login', next)}
               className="block w-full bg-emerald-500 hover:bg-emerald-600 text-slate-950 font-bold py-4 rounded-2xl text-sm transition shadow-lg shadow-emerald-500/20"
             >
               Als Kunde anmelden
@@ -40,5 +46,13 @@ export default function LoginSelectionPage() {
         &copy; {new Date().getFullYear()} VeriFit. Alle Rechte vorbehalten.
       </footer>
     </main>
+  );
+}
+
+export default function LoginSelectionPage() {
+  return (
+    <Suspense fallback={<div className="min-h-screen bg-slate-950" />}>
+      <LoginSelection />
+    </Suspense>
   );
 }

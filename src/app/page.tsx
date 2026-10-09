@@ -1,4 +1,5 @@
 import Link from 'next/link';
+import HomeAuthLinks from '@/components/HomeAuthLinks';
 
 export default function HomePage() {
   return (
@@ -8,12 +9,7 @@ export default function HomePage() {
           VERIFIT<span className="text-white">.</span>
         </Link>
         <div className="flex items-center gap-4">
-          <Link href="/login" className="text-sm font-medium text-slate-300 hover:text-white transition">
-            Login
-          </Link>
-          <Link href="/register" className="bg-emerald-500 hover:bg-emerald-600 text-slate-950 font-semibold px-4 py-2 rounded-xl text-sm transition">
-            Registrieren
-          </Link>
+          <HomeAuthLinks />
         </div>
       </header>
 
@@ -47,6 +43,9 @@ export default function HomePage() {
           </Link>
           <Link href="/datenschutz" className="hover:text-slate-400 transition">
             Datenschutz
+          </Link>
+          <Link href="/agb" className="hover:text-slate-400 transition">
+            AGB
           </Link>
         </div>
       </footer>

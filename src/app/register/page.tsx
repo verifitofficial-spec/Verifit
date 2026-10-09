@@ -1,6 +1,12 @@
-import Link from 'next/link';
+'use client';
 
-export default function RegisterSelectionPage() {
+import { Suspense } from 'react';
+import Link from 'next/link';
+import { useNextParam, withNext } from '@/lib/nextParam';
+
+function RegisterSelection() {
+  const next = useNextParam();
+
   return (
     <main className="min-h-screen bg-slate-950 text-white flex flex-col justify-between">
       <header className="flex justify-between items-center px-6 py-6 max-w-7xl mx-auto w-full">
@@ -21,7 +27,7 @@ export default function RegisterSelectionPage() {
 
           <div className="space-y-4">
             <Link
-              href="/client/register"
+              href={withNext('/client/register', next)}
               className="block w-full bg-emerald-500 hover:bg-emerald-600 text-slate-950 font-bold py-4 rounded-2xl text-sm transition shadow-lg shadow-emerald-500/20"
             >
               Als Kunde registrieren
@@ -40,5 +46,13 @@ export default function RegisterSelectionPage() {
         &copy; {new Date().getFullYear()} VeriFit. Alle Rechte vorbehalten.
       </footer>
     </main>
+  );
+}
+
+export default function RegisterSelectionPage() {
+  return (
+    <Suspense fallback={<div className="min-h-screen bg-slate-950" />}>
+      <RegisterSelection />
+    </Suspense>
   );
 }

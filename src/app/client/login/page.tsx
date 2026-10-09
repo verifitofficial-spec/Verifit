@@ -1,23 +1,30 @@
 'use client';
 
-import { useState } from 'react';
+import { Suspense, useState } from 'react';
 import { useRouter } from 'next/navigation';
 import Link from 'next/link';
 import { supabase } from '@/app/lib/supabase';
 import { loginSchema } from '@/app/lib/validation/authSchemas';
 import { FormFieldError } from '@/components/FormError';
+import { translateAuthError } from '@/lib/authErrors';
+import { useNextParam, withNext } from '@/lib/nextParam';
 
-export default function ClientLoginPage() {
+function ClientLoginForm() {
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [loading, setLoading] = useState(false);
   const [errorMessage, setErrorMessage] = useState('');
+  const [infoMessage, setInfoMessage] = useState('');
+  const [canResend, setCanResend] = useState(false);
   const [fieldErrors, setFieldErrors] = useState<{ email?: string; password?: string }>({});
   const router = useRouter();
+  const next = useNextParam();
 
   async function handleLogin(e: React.FormEvent) {
     e.preventDefault();
     setErrorMessage('');
+    setInfoMessage('');
+    setCanResend(false);
     setFieldErrors({});
 
     const result = loginSchema.safeParse({ email, password });
@@ -39,7 +46,8 @@ export default function ClientLoginPage() {
     });
 
     if (error) {
-      setErrorMessage(error.message);
+      setErrorMessage(translateAuthError(error.message));
+      setCanResend(error.message.toLowerCase().includes('email not confirmed'));
       setLoading(false);
       return;
     }
@@ -55,41 +63,39 @@ export default function ClientLoginPage() {
       .from('profiles')
       .select('role')
       .eq('id', user.id)
-      .single();
+      .maybeSingle();
 
-    if (profileError || !profileData || profileData.role !== 'client') {
+    if (profileError || !profileData) {
       await supabase.auth.signOut();
-      setErrorMessage('Zugriff verwehrt. Dieser Account ist kein Kunden-Konto.');
+      setErrorMessage('Dein Profil konnte nicht geladen werden. Bitte versuche es erneut.');
       setLoading(false);
       return;
     }
 
-    const { data: existingClient } = await supabase
-      .from('clients')
-      .select('id')
-      .eq('id', user.id)
-      .single();
-
-    if (!existingClient) {
-      await supabase.from('clients').delete().eq('email', user.email);
-
-      const { error: insertError } = await supabase.from('clients').insert([
-        {
-          id: user.id,
-          name: user.email?.split('@')[0] || 'Kunde',
-          email: user.email,
-        },
-      ]);
-
-      if (insertError) {
-        setErrorMessage('Fehler beim Synchronisieren des Profils: ' + insertError.message);
-        setLoading(false);
-        return;
-      }
+    if (profileData.role !== 'client') {
+      await supabase.auth.signOut();
+      setErrorMessage(
+        profileData.role === 'trainer'
+          ? 'Dieser Account ist ein Trainer-Konto. Bitte nutze den Trainer-Login.'
+          : 'Dieser Account ist kein Kunden-Konto.'
+      );
+      setLoading(false);
+      return;
     }
 
-    router.refresh();
-    router.push(`/client/${user.id}/dashboard`);
+    router.push(next ?? `/client/${user.id}/dashboard`);
+  }
+
+  async function handleResend() {
+    setErrorMessage('');
+    setInfoMessage('');
+    const { error } = await supabase.auth.resend({
+      type: 'signup',
+      email: email.trim(),
+      options: { emailRedirectTo: `${window.location.origin}${withNext('/client/login', next)}` },
+    });
+    if (error) setErrorMessage(translateAuthError(error.message));
+    else setInfoMessage('Wir haben dir eine neue Bestätigungs-E-Mail geschickt.');
   }
 
   return (
@@ -106,11 +112,23 @@ export default function ClientLoginPage() {
       <section className="flex flex-col items-center justify-center px-6 py-12 max-w-md mx-auto w-full flex-1">
         <div className="w-full bg-slate-900 border border-slate-800 rounded-2xl p-8 shadow-2xl">
           <h1 className="text-2xl font-extrabold mb-2 text-center">Kunden-Login</h1>
-          <p className="text-slate-400 text-sm text-center mb-6">Gib deine E-Mail und dein Passwort ein.</p>
+          <p className="text-slate-400 text-sm text-center mb-6">
+            {next ? 'Melde dich an, um deine Buchung fortzusetzen.' : 'Gib deine E-Mail und dein Passwort ein.'}
+          </p>
 
           {errorMessage && (
-            <div className="mb-4 p-3 bg-red-500/10 border border-red-500/20 rounded-xl text-red-400 text-xs">
-              {errorMessage}
+            <div className="mb-4 p-3 bg-red-500/10 border border-red-500/20 rounded-xl text-red-400 text-xs space-y-2">
+              <p>{errorMessage}</p>
+              {canResend && (
+                <button type="button" onClick={handleResend} className="underline text-red-300 cursor-pointer">
+                  Bestätigungs-E-Mail erneut senden
+                </button>
+              )}
+            </div>
+          )}
+          {infoMessage && (
+            <div className="mb-4 p-3 bg-emerald-500/10 border border-emerald-500/20 rounded-xl text-emerald-400 text-xs">
+              {infoMessage}
             </div>
           )}
 
@@ -121,6 +139,7 @@ export default function ClientLoginPage() {
               </label>
               <input
                 type="email"
+                autoComplete="email"
                 placeholder="name@example.com"
                 value={email}
                 onChange={(e) => setEmail(e.target.value)}
@@ -136,6 +155,7 @@ export default function ClientLoginPage() {
               </label>
               <input
                 type="password"
+                autoComplete="current-password"
                 placeholder="••••••••"
                 value={password}
                 onChange={(e) => setPassword(e.target.value)}
@@ -144,6 +164,11 @@ export default function ClientLoginPage() {
                 }`}
               />
               <FormFieldError message={fieldErrors.password} />
+              <div className="text-right mt-2">
+                <Link href="/forgot-password" className="text-xs text-slate-400 hover:text-emerald-400 transition">
+                  Passwort vergessen?
+                </Link>
+              </div>
             </div>
             <button
               type="submit"
@@ -156,7 +181,7 @@ export default function ClientLoginPage() {
 
           <div className="mt-6 text-center text-xs text-slate-500">
             Noch kein Konto?{' '}
-            <Link href="/client/register" className="text-emerald-400 hover:underline">
+            <Link href={withNext('/client/register', next)} className="text-emerald-400 hover:underline">
               Jetzt registrieren
             </Link>
           </div>
@@ -167,5 +192,13 @@ export default function ClientLoginPage() {
         &copy; {new Date().getFullYear()} VeriFit. Alle Rechte vorbehalten.
       </footer>
     </main>
+  );
+}
+
+export default function ClientLoginPage() {
+  return (
+    <Suspense fallback={<div className="min-h-screen bg-slate-950" />}>
+      <ClientLoginForm />
+    </Suspense>
   );
 }

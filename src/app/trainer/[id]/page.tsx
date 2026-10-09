@@ -4,6 +4,9 @@ import { useEffect, useState } from 'react';
 import Link from 'next/link';
 import { useParams } from 'next/navigation';
 import { supabase } from '@/app/lib/supabase';
+import { parseSpecialties } from '@/lib/trainer-dashboard/utils';
+import { useAuthProfile } from '@/lib/useAuthProfile';
+import { withNext } from '@/lib/nextParam';
 
 type PublicTrainer = {
   id: string;
@@ -40,6 +43,8 @@ type BookingResponse = {
   success?: boolean;
 };
 
+const PENDING_KEY = 'verifit:pendingBooking';
+
 function formatPrice(price: number) {
   return price > 0 ? `${price.toFixed(2).replace('.', ',')} €` : 'Kostenlos';
 }
@@ -47,6 +52,7 @@ function formatPrice(price: number) {
 export default function TrainerPublicProfile() {
   const params = useParams<{ id: string }>();
   const trainerId = params.id;
+  const auth = useAuthProfile();
 
   const [trainer, setTrainer] = useState<PublicTrainer | null>(null);
   const [offers, setOffers] = useState<TrainerOffer[]>([]);
@@ -57,40 +63,59 @@ export default function TrainerPublicProfile() {
   const [submitting, setSubmitting] = useState(false);
   const [message, setMessage] = useState<{ type: 'error' | 'success'; text: string } | null>(null);
 
+  const returnPath = `/trainer/${trainerId}`;
+
   useEffect(() => {
     async function loadPublicData() {
       if (!trainerId) return;
 
-      const [{ data: trainerData, error: trainerError }, { data: offerData }, { data: slotData }] =
-        await Promise.all([
-          supabase
-            .from('trainers')
-            .select(
-              'id, name, bio, city, service_mode, specialties, qualifications, avatar_url, instagram_url, tiktok_url, hourly_rate'
-            )
-            .eq('id', trainerId)
-            .eq('status', 'approved')
-            .maybeSingle(),
-          supabase
-            .from('trainer_offers')
-            .select('id, title, type, duration_minutes, price, description')
-            .eq('trainer_id', trainerId)
-            .eq('is_active', true)
-            .order('created_at', { ascending: true }),
-          supabase
-            .from('trainer_slots')
-            .select('id, slot_date, slot_time')
-            .eq('trainer_id', trainerId)
-            .eq('status', 'free')
-            .order('slot_date', { ascending: true })
-            .order('slot_time', { ascending: true }),
-        ]);
+      const [{ data: trainerData, error: trainerError }, { data: offerData }, { data: slotData }] = await Promise.all([
+        supabase
+          .from('trainers')
+          .select('id, name, bio, city, service_mode, specialties, qualifications, avatar_url, instagram_url, tiktok_url, hourly_rate')
+          .eq('id', trainerId)
+          .eq('status', 'approved')
+          .maybeSingle(),
+        supabase
+          .from('trainer_offers')
+          .select('id, title, type, duration_minutes, price, description')
+          .eq('trainer_id', trainerId)
+          .eq('is_active', true)
+          .order('created_at', { ascending: true }),
+        supabase
+          .from('trainer_slots')
+          .select('id, slot_date, slot_time')
+          .eq('trainer_id', trainerId)
+          .eq('status', 'free')
+          .order('slot_date', { ascending: true })
+          .order('slot_time', { ascending: true }),
+      ]);
 
-      if (!trainerError && trainerData) {
-        setTrainer(trainerData);
+      if (!trainerError && trainerData) setTrainer(trainerData);
+      const loadedOffers = (offerData ?? []) as TrainerOffer[];
+      const loadedSlots = (slotData ?? []) as TrainerSlot[];
+      setOffers(loadedOffers);
+      setSlots(loadedSlots);
+
+      // Nach Login/Registrierung: vorherige Auswahl wiederherstellen.
+      try {
+        const raw = sessionStorage.getItem(PENDING_KEY);
+        if (raw) {
+          sessionStorage.removeItem(PENDING_KEY);
+          const pending = JSON.parse(raw) as { trainerId?: string; offerId?: string; slotId?: string };
+          if (pending.trainerId === trainerId) {
+            const offer = loadedOffers.find((o) => o.id === pending.offerId);
+            const slot = loadedSlots.find((s) => s.id === pending.slotId);
+            if (offer && slot) {
+              setSelectedOffer(offer);
+              setBookingSlot(slot);
+            }
+          }
+        }
+      } catch {
+        /* sessionStorage nicht verfügbar */
       }
-      setOffers((offerData ?? []) as TrainerOffer[]);
-      setSlots((slotData ?? []) as TrainerSlot[]);
+
       setLoading(false);
     }
 
@@ -109,6 +134,17 @@ export default function TrainerPublicProfile() {
     setSlots((data ?? []) as TrainerSlot[]);
   }
 
+  function openBooking(slot: TrainerSlot) {
+    if (!auth.userId && selectedOffer) {
+      try {
+        sessionStorage.setItem(PENDING_KEY, JSON.stringify({ trainerId, offerId: selectedOffer.id, slotId: slot.id }));
+      } catch {
+        /* sessionStorage nicht verfügbar */
+      }
+    }
+    setBookingSlot(slot);
+  }
+
   async function handleBooking() {
     if (!bookingSlot || !selectedOffer) return;
 
@@ -121,20 +157,14 @@ export default function TrainerPublicProfile() {
 
     if (!session) {
       setSubmitting(false);
-      setMessage({
-        type: 'error',
-        text: 'Bitte melde dich zuerst mit deinem Kunden-Konto an, um einen Termin anzufragen.',
-      });
+      setMessage({ type: 'error', text: 'Deine Sitzung ist abgelaufen. Bitte melde dich erneut an.' });
       return;
     }
 
     try {
       const response = await fetch('/api/book-slot', {
         method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-          Authorization: `Bearer ${session.access_token}`,
-        },
+        headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${session.access_token}` },
         body: JSON.stringify({ slotId: bookingSlot.id, offerId: selectedOffer.id }),
       });
       const data = (await response.json().catch(() => ({}))) as BookingResponse;
@@ -172,6 +202,12 @@ export default function TrainerPublicProfile() {
     );
   }
 
+  const slotsByDate = slots.reduce<Record<string, TrainerSlot[]>>((grouped, slot) => {
+    (grouped[slot.slot_date] ??= []).push(slot);
+    return grouped;
+  }, {});
+  const calendarDates = Object.keys(slotsByDate).sort();
+
   if (!trainer) {
     return (
       <main className="min-h-screen bg-slate-950 text-white flex flex-col items-center justify-center p-4">
@@ -183,31 +219,40 @@ export default function TrainerPublicProfile() {
     );
   }
 
+  const specialtyList = parseSpecialties(trainer.specialties);
+  const isClient = auth.role === 'client';
+
   return (
     <main className="min-h-screen bg-slate-950 text-white flex flex-col justify-between">
       <header className="flex justify-between items-center px-6 py-6 max-w-7xl mx-auto w-full border-b border-slate-900">
         <Link href="/" className="text-2xl font-black tracking-wider text-emerald-400">
-          VERIFIT<span className="text-white">.</span>{' '}
-          <span className="text-xs text-slate-400 font-normal">Expert Hub</span>
+          VERIFIT<span className="text-white">.</span> <span className="text-xs text-slate-400 font-normal">Expert Hub</span>
         </Link>
-        <Link
-          href="/client/login"
-          className="text-xs bg-slate-900 hover:bg-slate-800 text-slate-300 px-4 py-2 rounded-xl transition border border-slate-800"
-        >
-          Kunden-Login
-        </Link>
+        {!auth.loading && !auth.userId && (
+          <Link
+            href={withNext('/client/login', returnPath)}
+            className="text-xs bg-slate-900 hover:bg-slate-800 text-slate-300 px-4 py-2 rounded-xl transition border border-slate-800"
+          >
+            Kunden-Login
+          </Link>
+        )}
       </header>
 
       <section className="max-w-4xl mx-auto px-6 py-12 w-full flex-1 space-y-8">
         {message && (
           <div
-            className={`p-4 rounded-xl text-sm border text-center ${
+            className={`p-4 rounded-xl text-sm border text-center space-y-1 ${
               message.type === 'error'
                 ? 'bg-red-500/10 border-red-500/20 text-red-400'
                 : 'bg-emerald-500/10 border-emerald-500/25 text-emerald-400'
             }`}
           >
-            {message.text}
+            <p>{message.text}</p>
+            {message.type === 'success' && auth.homeHref && (
+              <Link href={auth.homeHref} className="underline text-emerald-300 text-xs">
+                Anfrage im Dashboard ansehen
+              </Link>
+            )}
           </div>
         )}
 
@@ -230,7 +275,7 @@ export default function TrainerPublicProfile() {
                 </div>
                 <p className="text-slate-400 text-sm">
                   {trainer.city || 'Standort flexibel'} &bull;{' '}
-                  <span className="text-emerald-400 font-medium">{trainer.service_mode || 'Hybrid'}</span>
+                  <span className="text-emerald-400 font-medium">{trainer.service_mode || 'Vor Ort & Online'}</span>
                 </p>
               </div>
             </div>
@@ -246,13 +291,10 @@ export default function TrainerPublicProfile() {
             <div>
               <h2 className="text-xs font-semibold text-slate-400 uppercase tracking-wider mb-2">Fachgebiete & Spezialisierungen</h2>
               <div className="flex flex-wrap gap-2">
-                {trainer.specialties ? (
-                  trainer.specialties.split(',').map((specialty) => (
-                    <span
-                      key={specialty.trim()}
-                      className="bg-slate-950 border border-slate-800 text-emerald-400 text-xs px-3 py-1 rounded-lg font-medium"
-                    >
-                      {specialty.trim()}
+                {specialtyList.length > 0 ? (
+                  specialtyList.map((specialty) => (
+                    <span key={specialty} className="bg-slate-950 border border-slate-800 text-emerald-400 text-xs px-3 py-1 rounded-lg font-medium">
+                      {specialty}
                     </span>
                   ))
                 ) : (
@@ -272,31 +314,19 @@ export default function TrainerPublicProfile() {
 
             <div>
               <h2 className="text-xs font-semibold text-slate-400 uppercase tracking-wider mb-2">Über mich & Philosophie</h2>
-              <p className="text-sm text-slate-300 whitespace-pre-line leading-relaxed">
-                {trainer.bio || 'Keine Biografie vorhanden.'}
-              </p>
+              <p className="text-sm text-slate-300 whitespace-pre-line leading-relaxed">{trainer.bio || 'Keine Biografie vorhanden.'}</p>
             </div>
           </div>
 
           {(trainer.instagram_url || trainer.tiktok_url) && (
             <div className="flex gap-3 pt-4 border-t border-slate-800">
               {trainer.instagram_url && (
-                <a
-                  href={trainer.instagram_url}
-                  target="_blank"
-                  rel="noopener noreferrer"
-                  className="text-xs bg-slate-950 hover:bg-slate-800 border border-slate-800 text-slate-300 px-4 py-2 rounded-xl transition"
-                >
+                <a href={trainer.instagram_url} target="_blank" rel="noopener noreferrer" className="text-xs bg-slate-950 hover:bg-slate-800 border border-slate-800 text-slate-300 px-4 py-2 rounded-xl transition">
                   Instagram ↗
                 </a>
               )}
               {trainer.tiktok_url && (
-                <a
-                  href={trainer.tiktok_url}
-                  target="_blank"
-                  rel="noopener noreferrer"
-                  className="text-xs bg-slate-950 hover:bg-slate-800 border border-slate-800 text-slate-300 px-4 py-2 rounded-xl transition"
-                >
+                <a href={trainer.tiktok_url} target="_blank" rel="noopener noreferrer" className="text-xs bg-slate-950 hover:bg-slate-800 border border-slate-800 text-slate-300 px-4 py-2 rounded-xl transition">
                   TikTok ↗
                 </a>
               )}
@@ -324,9 +354,7 @@ export default function TrainerPublicProfile() {
                     type="button"
                     onClick={() => setSelectedOffer(offer)}
                     className={`text-left bg-slate-950 border rounded-xl p-5 transition ${
-                      isSelected
-                        ? 'border-emerald-500 ring-1 ring-emerald-500'
-                        : 'border-slate-800 hover:border-slate-700'
+                      isSelected ? 'border-emerald-500 ring-1 ring-emerald-500' : 'border-slate-800 hover:border-slate-700'
                     }`}
                   >
                     <div className="flex items-start justify-between gap-4">
@@ -336,9 +364,7 @@ export default function TrainerPublicProfile() {
                         </span>
                         <h3 className="mt-1 text-base font-bold text-white">{offer.title}</h3>
                       </div>
-                      <span className="text-sm font-bold text-emerald-400 whitespace-nowrap">
-                        {formatPrice(Number(offer.price))}
-                      </span>
+                      <span className="text-sm font-bold text-emerald-400 whitespace-nowrap">{formatPrice(Number(offer.price))}</span>
                     </div>
                     <p className="mt-2 text-xs text-slate-400">{offer.duration_minutes} Minuten</p>
                     {offer.description && <p className="mt-3 text-xs text-slate-300">{offer.description}</p>}
@@ -353,9 +379,7 @@ export default function TrainerPublicProfile() {
           <div>
             <h2 className="text-xl font-extrabold mb-1">2. Freien Termin auswählen</h2>
             <p className="text-slate-400 text-sm">
-              {selectedOffer
-                ? `Du fragst „${selectedOffer.title}“ an.`
-                : 'Wähle oben ein Paket aus, bevor du einen Termin anfragst.'}
+              {selectedOffer ? `Du fragst „${selectedOffer.title}“ an.` : 'Wähle oben ein Paket aus, bevor du einen Termin anfragst.'}
             </p>
           </div>
 
@@ -364,25 +388,31 @@ export default function TrainerPublicProfile() {
               Aktuell sind keine freien Termine verfügbar. Schau bald wieder vorbei!
             </div>
           ) : (
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-              {slots.map((slot) => (
-                <div key={slot.id} className="bg-slate-950 border border-slate-800 rounded-xl p-4 flex justify-between items-center gap-4">
-                  <div>
-                    <span className="text-xs font-bold text-emerald-400 block mb-0.5">
-                      {slot.slot_date} um {slot.slot_time?.slice(0, 5) || '--:--'} Uhr
-                    </span>
-                    <p className="text-xs text-slate-400">Anfrage wird vom Trainer bestätigt.</p>
+            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
+              {calendarDates.map((date) => {
+                const dateLabel = new Intl.DateTimeFormat('de-DE', { weekday: 'short', day: '2-digit', month: '2-digit', year: 'numeric' }).format(new Date(`${date}T12:00:00`));
+                return (
+                  <div key={date} className="bg-slate-950 border border-slate-800 rounded-xl p-4 space-y-3">
+                    <div className="flex items-center justify-between border-b border-slate-800 pb-2">
+                      <span className="text-xs font-bold text-white capitalize">{dateLabel}</span>
+                      <span className="text-[10px] text-emerald-400">{slotsByDate[date].length} frei</span>
+                    </div>
+                    <div className="grid grid-cols-2 gap-2">
+                      {slotsByDate[date].map((slot) => (
+                        <button
+                          key={slot.id}
+                          type="button"
+                          disabled={!selectedOffer}
+                          onClick={() => openBooking(slot)}
+                          className="bg-slate-900 hover:bg-emerald-500 hover:text-slate-950 border border-slate-700 hover:border-emerald-400 rounded-lg px-2 py-2 text-xs font-bold transition disabled:opacity-40 disabled:cursor-not-allowed"
+                        >
+                          {slot.slot_time?.slice(0, 5) || '--:--'} Uhr
+                        </button>
+                      ))}
+                    </div>
                   </div>
-                  <button
-                    type="button"
-                    disabled={!selectedOffer}
-                    onClick={() => setBookingSlot(slot)}
-                    className="bg-emerald-500 hover:bg-emerald-600 text-slate-950 font-bold px-4 py-2 rounded-xl text-xs transition disabled:opacity-40 disabled:cursor-not-allowed"
-                  >
-                    Anfragen
-                  </button>
-                </div>
-              ))}
+                );
+              })}
             </div>
           )}
         </div>
@@ -393,12 +423,7 @@ export default function TrainerPublicProfile() {
           <div className="bg-slate-900 border border-slate-800 rounded-2xl max-w-md w-full p-6 space-y-4 shadow-2xl">
             <div className="flex justify-between items-center">
               <h2 className="text-base font-bold text-white">Termin verbindlich anfragen</h2>
-              <button
-                type="button"
-                onClick={() => setBookingSlot(null)}
-                className="text-slate-400 hover:text-white text-lg"
-                aria-label="Buchungsdialog schließen"
-              >
+              <button type="button" onClick={() => setBookingSlot(null)} className="text-slate-400 hover:text-white text-lg" aria-label="Buchungsdialog schließen">
                 &times;
               </button>
             </div>
@@ -409,26 +434,53 @@ export default function TrainerPublicProfile() {
               </p>
               <p className="text-slate-400">{formatPrice(Number(selectedOffer.price))}</p>
             </div>
-            <p className="text-xs text-slate-400">
-              Der Trainer prüft deine Anfrage zuerst. Bei kostenpflichtigen Angeboten erhältst du danach eine Zahlungsaufforderung.
-            </p>
-            <div className="flex justify-end gap-2 pt-2">
-              <button
-                type="button"
-                onClick={() => setBookingSlot(null)}
-                className="bg-slate-800 hover:bg-slate-700 text-white px-4 py-2 rounded-xl text-xs font-bold"
-              >
-                Abbrechen
-              </button>
-              <button
-                type="button"
-                disabled={submitting}
-                onClick={handleBooking}
-                className="bg-emerald-500 hover:bg-emerald-600 text-slate-950 px-4 py-2 rounded-xl text-xs font-bold disabled:opacity-60"
-              >
-                {submitting ? 'Sende Anfrage...' : 'Anfrage absenden'}
-              </button>
-            </div>
+
+            {auth.loading ? (
+              <p className="text-xs text-slate-400">Prüfe Anmeldung...</p>
+            ) : !auth.userId ? (
+              <div className="space-y-3">
+                <p className="text-xs text-slate-300 leading-relaxed">
+                  Zum Anfragen dieses Termins brauchst du ein Kunden-Konto. Nach der Anmeldung kommst du direkt hierher zurück, deine Auswahl bleibt erhalten.
+                </p>
+                <div className="flex flex-col sm:flex-row gap-2">
+                  <Link
+                    href={withNext('/client/login', returnPath)}
+                    className="flex-1 text-center bg-emerald-500 hover:bg-emerald-600 text-slate-950 px-4 py-2.5 rounded-xl text-xs font-bold"
+                  >
+                    Anmelden
+                  </Link>
+                  <Link
+                    href={withNext('/client/register', returnPath)}
+                    className="flex-1 text-center bg-slate-800 hover:bg-slate-700 border border-slate-700 text-white px-4 py-2.5 rounded-xl text-xs font-bold"
+                  >
+                    Registrieren
+                  </Link>
+                </div>
+              </div>
+            ) : !isClient ? (
+              <p className="text-xs text-amber-300 bg-amber-500/10 border border-amber-500/20 rounded-xl p-3">
+                Du bist mit einem Trainer- bzw. Admin-Konto angemeldet. Termine können nur mit einem Kunden-Konto angefragt werden.
+              </p>
+            ) : (
+              <>
+                <p className="text-xs text-slate-400">
+                  Der Trainer prüft deine Anfrage zuerst. Bei kostenpflichtigen Angeboten erhältst du danach eine Zahlungsaufforderung in deinem Dashboard.
+                </p>
+                <div className="flex justify-end gap-2 pt-2">
+                  <button type="button" onClick={() => setBookingSlot(null)} className="bg-slate-800 hover:bg-slate-700 text-white px-4 py-2 rounded-xl text-xs font-bold">
+                    Abbrechen
+                  </button>
+                  <button
+                    type="button"
+                    disabled={submitting}
+                    onClick={handleBooking}
+                    className="bg-emerald-500 hover:bg-emerald-600 text-slate-950 px-4 py-2 rounded-xl text-xs font-bold disabled:opacity-60"
+                  >
+                    {submitting ? 'Sende Anfrage...' : 'Anfrage absenden'}
+                  </button>
+                </div>
+              </>
+            )}
           </div>
         </div>
       )}

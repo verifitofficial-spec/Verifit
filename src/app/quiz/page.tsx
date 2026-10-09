@@ -1,33 +1,22 @@
 'use client';
 
-import { useEffect, useState } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
 import { supabase } from '@/app/lib/supabase';
+import { SPECIALTY_CATEGORIES, parseSpecialties } from '@/lib/constants';
+import { useAuthProfile } from '@/lib/useAuthProfile';
 
-// Exportierte Liste der Spezialisierungen / Quiz-Kategorien
-export const AVAILABLE_SPECIALTIES = [
-  'Gewichtsverlust',
-  'Muskelaufbau',
-  'Body-Transformation',
-  'Mobilität',
-  'Functional Fitness',
-  'Krafttraining',
-  'Ernährungsberatung',
-  'Rehabilitation'
-];
-
-type Trainer = {
+type QuizTrainer = {
   id: string;
-  name: string;
-  bio: string;
-  status: string;
-  package_category?: string;
-  package_duration?: string;
-  package_price?: string | number;
-  city?: string;
-  service_mode?: string;
-  specialties?: string;
+  name: string | null;
+  avatar_url: string | null;
+  bio: string | null;
+  city: string | null;
+  service_mode: string | null;
+  specialtyList: string[];
+  minPrice: number | null;
+  freeSlots: number;
 };
 
 type QuizAnswers = {
@@ -37,222 +26,150 @@ type QuizAnswers = {
   budget: string;
 };
 
-const MASTER_GOAL_BLOCKS = [
-  {
-    category: "Hypertrophie & Muskelaufbau",
-    items: ["Muskelaufbau", "Hypertrophie", "Krafttraining", "Bodybuilding"]
-  },
-  {
-    category: "Gewichtsverlust & Transformation",
-    items: ["Gewichtsverlust", "Abnehmen", "Fettabbau", "Body-Transformation", "Ernährungsberatung"]
-  },
-  {
-    category: "Gesundheit & Prävention",
-    items: ["Rückentraining", "Reha", "Rehabilitation", "Haltung", "Schmerzprävention", "Mobilität"]
-  },
-  {
-    category: "Performance & Athletik",
-    items: ["Leistungsdiagnostik", "Athletiktraining", "Ausdauer", "Functional Fitness"]
-  }
-];
+type PriceRange = { min: number; max: number };
+
+const EMPTY_ANSWERS: QuizAnswers = { experience: '', goal: '', mode: '', budget: '' };
+
+function matchesExperience(t: QuizTrainer, experience: string) {
+  if (!experience) return true;
+  const context = `${t.bio ?? ''} ${t.specialtyList.join(' ')}`.toLowerCase();
+  if (experience === 'Anfänger' && (context.includes('nur profis') || context.includes('leistungssportler'))) return false;
+  if (experience === 'Profi' && (context.includes('nur anfänger') || context.includes('einsteiger'))) return false;
+  return true;
+}
+
+function matchesMode(t: QuizTrainer, mode: string) {
+  if (!mode) return true;
+  const sm = (t.service_mode ?? '').toLowerCase();
+  if (!sm) return true;
+  const onsite = sm.includes('vor ort');
+  const online = sm.includes('online');
+  const hybrid = sm.includes('hybrid') || (onsite && online);
+  if (mode === 'Vor Ort') return onsite || hybrid;
+  if (mode === 'Online') return online || hybrid;
+  return hybrid;
+}
+
+function budgetThresholds(range: PriceRange) {
+  const third = (range.max - range.min) / 3;
+  return { t1: range.min + third, t2: range.min + third * 2 };
+}
+
+function matchesBudget(t: QuizTrainer, budget: string, range: PriceRange) {
+  if (!budget || t.minPrice === null || range.max === range.min) return true;
+  const { t1, t2 } = budgetThresholds(range);
+  if (budget === 'low') return t.minPrice <= t1;
+  if (budget === 'mid') return t.minPrice > t1 && t.minPrice <= t2;
+  return t.minPrice > t2;
+}
+
+function filterTrainers(list: QuizTrainer[], answers: QuizAnswers, withBudget: boolean, range: PriceRange) {
+  return list.filter(
+    (t) =>
+      matchesExperience(t, answers.experience) &&
+      (!answers.goal || t.specialtyList.includes(answers.goal)) &&
+      matchesMode(t, answers.mode) &&
+      (!withBudget || matchesBudget(t, answers.budget, range))
+  );
+}
+
+const optionBtn =
+  'p-4 bg-slate-900 hover:bg-slate-800 border border-slate-800 hover:border-emerald-500 rounded-2xl text-left font-semibold text-sm transition cursor-pointer flex justify-between items-center group';
 
 export default function QuizPage() {
   const router = useRouter();
-  const [trainers, setTrainers] = useState<Trainer[]>([]);
+  const auth = useAuthProfile();
+  const [trainers, setTrainers] = useState<QuizTrainer[]>([]);
   const [loading, setLoading] = useState(true);
-
   const [view, setView] = useState<'quiz' | 'results'>('quiz');
-  const [step, setStep] = useState<number>(1);
-  const [answers, setAnswers] = useState<QuizAnswers>({
-    experience: '',
-    goal: '',
-    mode: '',
-    budget: '',
-  });
-
-  const [filteredResults, setFilteredResults] = useState<Trainer[]>([]);
-
-  const [activeTrainerKeywords, setActiveTrainerKeywords] = useState<string[]>([]);
-  
-  // Dynamische Preisspannen für Schritt 4
-  const [dynamicPriceRange, setDynamicPriceRange] = useState({ min: 0, max: 500 });
+  const [step, setStep] = useState(1);
+  const [answers, setAnswers] = useState<QuizAnswers>(EMPTY_ANSWERS);
 
   useEffect(() => {
-    async function fetchApprovedTrainers() {
-      setLoading(true);
-      const { data, error } = await supabase
-        .from('trainers')
-        .select('*')
-        .eq('status', 'approved');
+    async function fetchData() {
+      const today = new Date().toLocaleDateString('en-CA');
+      const [trainerRes, offerRes, slotRes] = await Promise.all([
+        supabase
+          .from('trainers')
+          .select('id, name, bio, avatar_url, city, service_mode, specialties, package_price')
+          .eq('status', 'approved'),
+        supabase.from('trainer_offers').select('trainer_id, price, type').eq('is_active', true),
+        supabase.from('trainer_slots').select('trainer_id').eq('status', 'free').gte('slot_date', today),
+      ]);
 
-      if (error) {
-        console.error('Fehler beim Laden der Trainer:', error.message);
-      } else {
-        const list = data || [];
-        setTrainers(list);
-
-        const keywords = new Set<string>();
-        list.forEach(t => {
-          if (t.specialties) {
-            t.specialties.split(',').forEach((part: string) => {
-              const clean = part.trim().toLowerCase();
-              if (clean) keywords.add(clean);
-            });
-          }
-        });
-        setActiveTrainerKeywords(Array.from(keywords));
+      if (trainerRes.error) {
+        console.error('Fehler beim Laden der Trainer:', trainerRes.error.message);
+        setLoading(false);
+        return;
       }
+
+      const minPriceByTrainer = new Map<string, number>();
+      for (const offer of offerRes.data ?? []) {
+        const price = Number(offer.price);
+        if (offer.type !== 'paid' || !(price > 0)) continue;
+        const current = minPriceByTrainer.get(offer.trainer_id);
+        if (current === undefined || price < current) minPriceByTrainer.set(offer.trainer_id, price);
+      }
+
+      const slotsByTrainer = new Map<string, number>();
+      for (const slot of slotRes.data ?? []) {
+        slotsByTrainer.set(slot.trainer_id, (slotsByTrainer.get(slot.trainer_id) ?? 0) + 1);
+      }
+
+      setTrainers(
+        (trainerRes.data ?? []).map((t) => {
+          const legacyPrice = Number(t.package_price);
+          return {
+            id: t.id,
+            name: t.name,
+            avatar_url: t.avatar_url,
+            bio: t.bio,
+            city: t.city,
+            service_mode: t.service_mode,
+            specialtyList: parseSpecialties(t.specialties),
+            minPrice: minPriceByTrainer.get(t.id) ?? (legacyPrice > 0 ? legacyPrice : null),
+            freeSlots: slotsByTrainer.get(t.id) ?? 0,
+          };
+        })
+      );
       setLoading(false);
     }
 
-    fetchApprovedTrainers();
+    fetchData();
   }, []);
 
-  const isGoalAvailable = (item: string) => {
-    const query = item.toLowerCase();
-    const synonyms = [query];
-    if (query === 'gewichtsverlust') synonyms.push('abnehmen', 'fettabbau');
-    if (query === 'abnehmen') synonyms.push('gewichtsverlust');
-    if (query === 'rehabilitation') synonyms.push('reha');
-    if (query === 'reha') synonyms.push('rehabilitation');
+  const availableGoals = useMemo(() => new Set(trainers.flatMap((t) => t.specialtyList)), [trainers]);
 
-    return activeTrainerKeywords.some(kw => 
-      synonyms.some(s => kw.includes(s) || s.includes(kw))
+  // Preisspanne richtet sich nach den Trainern, die zu Erfahrung, Ziel und Trainingsform passen.
+  const priceRange = useMemo<PriceRange>(() => {
+    const prices = filterTrainers(trainers, answers, false, { min: 0, max: 0 })
+      .map((t) => t.minPrice)
+      .filter((p): p is number => p !== null);
+    return prices.length > 0 ? { min: Math.min(...prices), max: Math.max(...prices) } : { min: 50, max: 300 };
+  }, [trainers, answers]);
+
+  const results = useMemo(() => {
+    if (view !== 'results') return [];
+    return filterTrainers(trainers, answers, true, priceRange).sort(
+      (a, b) => Number(b.freeSlots > 0) - Number(a.freeSlots > 0) || (a.name ?? '').localeCompare(b.name ?? '', 'de')
     );
-  };
+  }, [view, trainers, answers, priceRange]);
 
-  const handleSelectOption = (key: keyof QuizAnswers, value: string) => {
-    const updatedAnswers = { ...answers, [key]: value };
-    setAnswers(updatedAnswers);
+  function handleSelectOption(key: keyof QuizAnswers, value: string) {
+    const updated = { ...answers, [key]: value };
+    setAnswers(updated);
+    if (step < 4) setStep((prev) => prev + 1);
+    else setView('results');
+  }
 
-    if (step < 4) {
-      if (step === 3) {
-        calculateDynamicBudgetRange(updatedAnswers);
-      }
-      setStep(prev => prev + 1);
-    } else {
-      executeMatching(updatedAnswers);
-    }
-  };
-
-  const calculateDynamicBudgetRange = (currentAnswers: QuizAnswers) => {
-    let relevantTrainers = [...trainers];
-
-    // Erfahrung (Experience) Filter einbinden
-    if (currentAnswers.experience) {
-        relevantTrainers = relevantTrainers.filter(t => {
-            if (!t.bio && !t.specialties) return true;
-            const context = `${t.bio || ''} ${t.specialties || ''}`.toLowerCase();
-            const exp = currentAnswers.experience.toLowerCase();
-            
-            // Wenn der Nutzer Anfänger ist, schließe Trainer aus, die sich nur an Profis/Leistungssportler richten
-            if (exp === 'anfänger' && (context.includes('nur profis') || context.includes('leistungssportler'))) return false;
-            // Wenn der Nutzer Profi ist, schließe Trainer aus, die sich nur an Anfänger richten
-            if (exp === 'profi' && (context.includes('nur anfänger') || context.includes('einsteiger'))) return false;
-            
-            return true;
-        });
-    }
-
-    if (currentAnswers.goal) {
-      relevantTrainers = relevantTrainers.filter(t => {
-        if (!t.specialties) return false;
-        const spec = t.specialties.toLowerCase();
-        const goal = currentAnswers.goal.toLowerCase();
-        return spec.includes(goal) || 
-               (goal === 'gewichtsverlust' && spec.includes('abnehmen')) ||
-               (goal === 'rehabilitation' && spec.includes('reha'));
-      });
-    }
-
-    if (currentAnswers.mode) {
-      relevantTrainers = relevantTrainers.filter(t => {
-        const mode = t.service_mode ? t.service_mode.toLowerCase() : '';
-        const targetMode = currentAnswers.mode.toLowerCase();
-        return mode === targetMode || mode === 'hybrid' || mode.includes('vor ort & online');
-      });
-    }
-
-    const prices = relevantTrainers
-      .map(t => (t.package_price ? parseFloat(String(t.package_price)) : NaN))
-      .filter(p => !isNaN(p));
-
-    if (prices.length > 0) {
-      setDynamicPriceRange({
-        min: Math.min(...prices),
-        max: Math.max(...prices),
-      });
-    } else {
-      setDynamicPriceRange({ min: 50, max: 300 }); // Fallback
-    }
-  };
-
-  const executeMatching = (finalAnswers: QuizAnswers) => {
-    setLoading(true);
-    setView('results');
-
-    let results = [...trainers];
-
-    // Erfahrung (Experience) beim finalen Matching filtern
-    if (finalAnswers.experience) {
-        results = results.filter(t => {
-            if (!t.bio && !t.specialties) return true;
-            const context = `${t.bio || ''} ${t.specialties || ''}`.toLowerCase();
-            const exp = finalAnswers.experience.toLowerCase();
-            
-            if (exp === 'anfänger' && (context.includes('nur profis') || context.includes('leistungssportler'))) return false;
-            if (exp === 'profi' && (context.includes('nur anfänger') || context.includes('einsteiger'))) return false;
-            
-            return true;
-        });
-    }
-
-    if (finalAnswers.goal) {
-      results = results.filter(t => {
-        if (!t.specialties) return false;
-        const spec = t.specialties.toLowerCase();
-        const goal = finalAnswers.goal.toLowerCase();
-
-        let matches = spec.includes(goal);
-        if (goal === 'gewichtsverlust') matches = matches || spec.includes('abnehmen') || spec.includes('fettabbau');
-        if (goal === 'abnehmen') matches = matches || spec.includes('gewichtsverlust');
-        if (goal === 'rehabilitation') matches = matches || spec.includes('reha');
-        if (goal === 'reha') matches = matches || spec.includes('rehabilitation');
-
-        return matches;
-      });
-    }
-
-    if (finalAnswers.mode) {
-      results = results.filter(t => {
-        const mode = t.service_mode ? t.service_mode.toLowerCase() : '';
-        const targetMode = finalAnswers.mode.toLowerCase();
-        return mode === targetMode || mode === 'hybrid' || mode.includes('vor ort & online');
-      });
-    }
-
-    if (finalAnswers.budget) {
-      results = results.filter(t => {
-        if (!t.package_price) return true;
-        const priceNum = typeof t.package_price === 'number' ? t.package_price : parseFloat(String(t.package_price));
-        if (isNaN(priceNum)) return true;
-
-        if (finalAnswers.budget === 'low') return priceNum <= (dynamicPriceRange.min + (dynamicPriceRange.max - dynamicPriceRange.min) / 3);
-        if (finalAnswers.budget === 'mid') return priceNum > (dynamicPriceRange.min + (dynamicPriceRange.max - dynamicPriceRange.min) / 3) && priceNum <= (dynamicPriceRange.min + ((dynamicPriceRange.max - dynamicPriceRange.min) / 3) * 2);
-        if (finalAnswers.budget === 'high') return priceNum > (dynamicPriceRange.min + ((dynamicPriceRange.max - dynamicPriceRange.min) / 3) * 2);
-        return true;
-      });
-    }
-
-    setFilteredResults(results);
-    setLoading(false);
-  };
-
-  const resetQuiz = () => {
+  function resetQuiz() {
     setStep(1);
-    setAnswers({ experience: '', goal: '', mode: '', budget: '' });
+    setAnswers(EMPTY_ANSWERS);
     setView('quiz');
-  };
+  }
+
+  const { t1, t2 } = budgetThresholds(priceRange);
+  const homeLabel = auth.homeHref ? 'Zum Dashboard' : 'Quiz verlassen';
 
   return (
     <main className="min-h-screen bg-slate-950 text-white flex flex-col justify-between">
@@ -261,14 +178,12 @@ export default function QuizPage() {
           VERIFIT<span className="text-white">.</span>
         </Link>
         <div className="flex items-center gap-4">
-          {view === 'quiz' && step <= 4 && (
-            <span className="text-xs text-slate-400 font-medium">Schritt {step} von 4</span>
-          )}
+          {view === 'quiz' && <span className="text-xs text-slate-400 font-medium">Schritt {step} von 4</span>}
           <button
-            onClick={() => router.push('/')}
-            className="text-xs bg-slate-900 border border-slate-800 hover:bg-slate-800 text-slate-300 px-3 py-1.5 rounded-xl transition cursor-pointer flex items-center gap-1.5"
+            onClick={() => router.push(auth.homeHref ?? '/')}
+            className="text-xs bg-slate-900 border border-slate-800 hover:bg-slate-800 text-slate-300 px-3 py-1.5 rounded-xl transition cursor-pointer"
           >
-            <span>&times;</span> Quiz verlassen
+            {homeLabel}
           </button>
         </div>
       </header>
@@ -281,14 +196,14 @@ export default function QuizPage() {
                 Geprüfte Qualität & Radikale Transparenz
               </span>
               <h1 className="text-3xl md:text-4xl font-black tracking-tight">
-                {step === 1 && "Wie stufst du dein aktuelles Fitness-Level ein?"}
-                {step === 2 && "Was ist dein primäres Trainingsziel?"}
-                {step === 3 && "Wie möchtest du trainieren?"}
-                {step === 4 && "Welches Budget passt zu deiner Planung?"}
+                {step === 1 && 'Wie stufst du dein aktuelles Fitness-Level ein?'}
+                {step === 2 && 'Was ist dein primäres Trainingsziel?'}
+                {step === 3 && 'Wie möchtest du trainieren?'}
+                {step === 4 && 'Welches Budget passt zu deiner Planung?'}
               </h1>
               {step === 4 && (
                 <p className="text-slate-400 text-xs">
-                  Basierend auf deinen vorherigen Angaben liegt die echte, verfügbare Marktspanne unserer Coaches bei ca. {dynamicPriceRange.min} € – {dynamicPriceRange.max} €.
+                  Basierend auf deinen Angaben liegt die verfügbare Spanne unserer Coaches bei ca. {Math.round(priceRange.min)} € – {Math.round(priceRange.max)} €.
                 </p>
               )}
             </div>
@@ -300,11 +215,7 @@ export default function QuizPage() {
                   { label: 'Fortgeschritten (trainiere regelmäßig & zielgerichtet)', val: 'Fortgeschritten' },
                   { label: 'Anfänger / Wiedereinsteiger', val: 'Anfänger' },
                 ].map((opt) => (
-                  <button
-                    key={opt.val}
-                    onClick={() => handleSelectOption('experience', opt.val)}
-                    className="p-4 bg-slate-900 hover:bg-slate-800 border border-slate-800 hover:border-emerald-500 rounded-2xl text-left font-semibold text-sm transition cursor-pointer flex justify-between items-center group"
-                  >
+                  <button key={opt.val} onClick={() => handleSelectOption('experience', opt.val)} className={optionBtn}>
                     <span className="group-hover:text-emerald-400 transition">{opt.label}</span>
                     <span className="text-emerald-400">&rarr;</span>
                   </button>
@@ -314,41 +225,43 @@ export default function QuizPage() {
 
             {step === 2 && (
               <div className="space-y-6 max-w-xl mx-auto w-full pt-2">
-                {MASTER_GOAL_BLOCKS.map((block) => (
-                  <div key={block.category} className="space-y-2">
-                    <h3 className="text-xs font-bold uppercase tracking-wider text-slate-500 px-1">
-                      {block.category}
-                    </h3>
-                    <div className="grid grid-cols-1 gap-2">
-                      {block.items.map((item) => {
-                        const available = isGoalAvailable(item);
-                        return (
-                          <button
-                            key={item}
-                            disabled={!available}
-                            onClick={() => available && handleSelectOption('goal', item)}
-                            className={`p-3.5 rounded-2xl text-left font-semibold text-sm transition flex justify-between items-center border ${
-                              available
-                                ? 'bg-slate-900 hover:bg-slate-800 border-slate-800 hover:border-emerald-500 text-white cursor-pointer group'
-                                : 'bg-slate-950/60 border-slate-900 text-slate-600 cursor-not-allowed opacity-60'
-                            }`}
-                          >
-                            <span className={available ? 'group-hover:text-emerald-400 transition' : ''}>
-                              {item}
-                            </span>
-                            {available ? (
-                              <span className="text-emerald-400">&rarr;</span>
-                            ) : (
-                              <span className="text-[10px] bg-slate-900 px-2 py-0.5 rounded text-slate-600 uppercase tracking-widest border border-slate-800">
-                                Zur Zeit nicht verfügbar
-                              </span>
-                            )}
-                          </button>
-                        );
-                      })}
+                {loading ? (
+                  <p className="text-center text-slate-400 text-sm">Lade verfügbare Fachgebiete...</p>
+                ) : availableGoals.size === 0 ? (
+                  <p className="text-center text-slate-400 text-sm">Aktuell sind noch keine verifizierten Trainer verfügbar.</p>
+                ) : (
+                  SPECIALTY_CATEGORIES.map((block) => (
+                    <div key={block.category} className="space-y-2">
+                      <h3 className="text-xs font-bold uppercase tracking-wider text-slate-500 px-1">{block.category}</h3>
+                      <div className="grid grid-cols-1 gap-2">
+                        {block.items.map((item) => {
+                          const available = availableGoals.has(item);
+                          return (
+                            <button
+                              key={item}
+                              disabled={!available}
+                              onClick={() => available && handleSelectOption('goal', item)}
+                              className={`p-3.5 rounded-2xl text-left font-semibold text-sm transition flex justify-between items-center border ${
+                                available
+                                  ? 'bg-slate-900 hover:bg-slate-800 border-slate-800 hover:border-emerald-500 text-white cursor-pointer group'
+                                  : 'bg-slate-950/60 border-slate-900 text-slate-600 cursor-not-allowed opacity-60'
+                              }`}
+                            >
+                              <span className={available ? 'group-hover:text-emerald-400 transition' : ''}>{item}</span>
+                              {available ? (
+                                <span className="text-emerald-400">&rarr;</span>
+                              ) : (
+                                <span className="text-[10px] bg-slate-900 px-2 py-0.5 rounded text-slate-600 uppercase tracking-widest border border-slate-800">
+                                  Zur Zeit nicht verfügbar
+                                </span>
+                              )}
+                            </button>
+                          );
+                        })}
+                      </div>
                     </div>
-                  </div>
-                ))}
+                  ))
+                )}
               </div>
             )}
 
@@ -359,11 +272,7 @@ export default function QuizPage() {
                   { label: 'Online-Coaching (Digital & App-basiert)', val: 'Online' },
                   { label: 'Hybrid (Kombination aus beidem)', val: 'Hybrid' },
                 ].map((opt) => (
-                  <button
-                    key={opt.val}
-                    onClick={() => handleSelectOption('mode', opt.val)}
-                    className="p-4 bg-slate-900 hover:bg-slate-800 border border-slate-800 hover:border-emerald-500 rounded-2xl text-left font-semibold text-sm transition cursor-pointer flex justify-between items-center group"
-                  >
+                  <button key={opt.val} onClick={() => handleSelectOption('mode', opt.val)} className={optionBtn}>
                     <span className="group-hover:text-emerald-400 transition">{opt.label}</span>
                     <span className="text-emerald-400">&rarr;</span>
                   </button>
@@ -374,15 +283,11 @@ export default function QuizPage() {
             {step === 4 && (
               <div className="grid grid-cols-1 gap-3 max-w-xl mx-auto w-full pt-4">
                 {[
-                  { label: `Einstieg / Flexibel (bis ca. ${Math.round(dynamicPriceRange.min + (dynamicPriceRange.max - dynamicPriceRange.min) / 3)} €)`, val: 'low' },
-                  { label: `Fortgeschritten / Standard (ca. ${Math.round(dynamicPriceRange.min + (dynamicPriceRange.max - dynamicPriceRange.min) / 3)} € – ${Math.round(dynamicPriceRange.min + ((dynamicPriceRange.max - dynamicPriceRange.min) / 3) * 2)} €)`, val: 'mid' },
-                  { label: `Intensiv / Premium Betreuung (ab ${Math.round(dynamicPriceRange.min + ((dynamicPriceRange.max - dynamicPriceRange.min) / 3) * 2)} €+)`, val: 'high' },
+                  { label: `Einstieg / Flexibel (bis ca. ${Math.round(t1)} €)`, val: 'low' },
+                  { label: `Fortgeschritten / Standard (ca. ${Math.round(t1)} € – ${Math.round(t2)} €)`, val: 'mid' },
+                  { label: `Intensiv / Premium Betreuung (ab ${Math.round(t2)} €+)`, val: 'high' },
                 ].map((opt) => (
-                  <button
-                    key={opt.val}
-                    onClick={() => handleSelectOption('budget', opt.val)}
-                    className="p-4 bg-slate-900 hover:bg-slate-800 border border-slate-800 hover:border-emerald-500 rounded-2xl text-left font-semibold text-sm transition cursor-pointer flex justify-between items-center group"
-                  >
+                  <button key={opt.val} onClick={() => handleSelectOption('budget', opt.val)} className={optionBtn}>
                     <span className="group-hover:text-emerald-400 transition">{opt.label}</span>
                     <span className="text-emerald-400">&rarr;</span>
                   </button>
@@ -392,10 +297,7 @@ export default function QuizPage() {
 
             {step > 1 && (
               <div className="text-center pt-2">
-                <button
-                  onClick={() => setStep(prev => prev - 1)}
-                  className="text-xs text-slate-400 hover:text-white transition cursor-pointer"
-                >
+                <button onClick={() => setStep((prev) => prev - 1)} className="text-xs text-slate-400 hover:text-white transition cursor-pointer">
                   &larr; Einen Schritt zurück
                 </button>
               </div>
@@ -405,9 +307,7 @@ export default function QuizPage() {
           <div className="space-y-8">
             <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-4 pb-6 border-b border-slate-800">
               <div>
-                <span className="text-xs text-emerald-400 font-semibold uppercase tracking-wider">
-                  Deine Ergebnisse (Transparent & Direkt)
-                </span>
+                <span className="text-xs text-emerald-400 font-semibold uppercase tracking-wider">Deine Ergebnisse (Transparent & Direkt)</span>
                 <h2 className="text-2xl font-extrabold mt-1">Passende Trainer-Matches</h2>
               </div>
               <button
@@ -418,50 +318,64 @@ export default function QuizPage() {
               </button>
             </div>
 
-            {loading ? (
-              <p className="text-center text-slate-400 py-12">Analysiere verifizierte Experten...</p>
-            ) : filteredResults.length === 0 ? (
+            {results.length === 0 ? (
               <div className="bg-slate-900 border border-slate-800 rounded-2xl p-12 text-center space-y-4">
                 <p className="text-slate-400 text-sm">Kein Trainer exakt auf diese Kombination gematcht.</p>
-                <button
-                  onClick={resetQuiz}
-                  className="bg-emerald-500 text-slate-950 font-semibold px-6 py-2.5 rounded-xl text-xs transition cursor-pointer"
-                >
-                  Quiz neu starten
-                </button>
+                <div className="flex justify-center gap-3">
+                  <button onClick={resetQuiz} className="bg-emerald-500 text-slate-950 font-semibold px-6 py-2.5 rounded-xl text-xs transition cursor-pointer">
+                    Quiz neu starten
+                  </button>
+                  <Link href="/trainer/list" className="bg-slate-800 border border-slate-700 text-white font-semibold px-6 py-2.5 rounded-xl text-xs transition">
+                    Alle Trainer ansehen
+                  </Link>
+                </div>
               </div>
             ) : (
               <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-                {filteredResults.map((trainer) => (
+                {results.map((trainer) => (
                   <div key={trainer.id} className="bg-slate-900 border border-slate-800 rounded-2xl p-6 flex flex-col justify-between space-y-6 shadow-xl">
                     <div className="space-y-3">
-                      <div className="flex justify-between items-start">
-                        <h3 className="text-xl font-bold">{trainer.name}</h3>
-                        <span className="text-xs bg-emerald-500/10 text-emerald-400 border border-emerald-500/20 px-2.5 py-1 rounded-full font-medium">
+                      <div className="flex justify-between items-start gap-3">
+                        <div className="flex items-center gap-3">
+                          <div className="w-12 h-12 rounded-xl overflow-hidden bg-slate-800 border border-slate-700 flex items-center justify-center text-lg font-bold text-emerald-400 shrink-0">
+                            {trainer.avatar_url ? <img src={trainer.avatar_url} alt="" className="w-full h-full object-cover" /> : <span>{trainer.name?.charAt(0) || 'T'}</span>}
+                          </div>
+                          <h3 className="text-xl font-bold">{trainer.name || 'Trainer'}</h3>
+                        </div>
+                        <span className="text-xs bg-emerald-500/10 text-emerald-400 border border-emerald-500/20 px-2.5 py-1 rounded-full font-medium whitespace-nowrap">
                           Verifiziert ✓
                         </span>
                       </div>
                       <p className="text-slate-400 text-xs">
-                        {trainer.city || 'Online'} • {trainer.service_mode || 'Hybrid'}
+                        {trainer.city || 'Online'} • {trainer.service_mode || 'Vor Ort & Online'}
                       </p>
                       <p className="text-emerald-400 text-xs font-semibold">
-                        {trainer.specialties || 'Individuelles Coaching'}
+                        {trainer.specialtyList.length > 0 ? trainer.specialtyList.join(', ') : 'Individuelles Coaching'}
                       </p>
-                      {trainer.package_price && (
-                        <p className="text-xs text-slate-300 bg-slate-950 p-2.5 rounded-xl border border-slate-800">
-                          Transparenter Preis: <strong className="text-emerald-400">{trainer.package_price} €</strong> {trainer.package_duration ? `(${trainer.package_duration})` : ''}
-                        </p>
-                      )}
+                      <div className="flex flex-wrap gap-2">
+                        {trainer.minPrice !== null && (
+                          <span className="text-xs text-slate-300 bg-slate-950 px-2.5 py-1.5 rounded-xl border border-slate-800">
+                            ab <strong className="text-emerald-400">{trainer.minPrice} €</strong>
+                          </span>
+                        )}
+                        <span
+                          className={`text-xs px-2.5 py-1.5 rounded-xl border ${
+                            trainer.freeSlots > 0
+                              ? 'bg-emerald-500/10 text-emerald-400 border-emerald-500/20'
+                              : 'bg-slate-950 text-slate-500 border-slate-800'
+                          }`}
+                        >
+                          {trainer.freeSlots > 0 ? `${trainer.freeSlots} freie Termine` : 'Aktuell keine freien Termine'}
+                        </span>
+                      </div>
                     </div>
 
-                    <div className="flex items-center gap-3 pt-2">
-                      <Link
-                        href={`/trainer/${trainer.id}`}
-                        className="flex-1 bg-emerald-500 hover:bg-emerald-600 text-slate-950 text-center font-bold py-2.5 rounded-xl text-xs transition"
-                      >
-                        Profil & Angebote ansehen
-                      </Link>
-                    </div>
+                    <Link
+                      href={`/trainer/${trainer.id}`}
+                      className="bg-emerald-500 hover:bg-emerald-600 text-slate-950 text-center font-bold py-2.5 rounded-xl text-xs transition"
+                    >
+                      Profil & Angebote ansehen
+                    </Link>
                   </div>
                 ))}
               </div>

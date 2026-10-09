@@ -1,6 +1,16 @@
 import { NextResponse } from 'next/server';
+import { getResendClient } from '@/app/lib/resend';
 import { getAdminClient, getRequestAuthentication } from '@/app/lib/supabaseServer';
 import { trainerStatusSchema } from '@/app/lib/validation/adminSchemas';
+
+function escapeHtml(value: string | null) {
+  return String(value ?? '')
+    .replace(/&/g, '&amp;')
+    .replace(/</g, '&lt;')
+    .replace(/>/g, '&gt;')
+    .replace(/"/g, '&quot;')
+    .replace(/'/g, '&#039;');
+}
 
 export async function POST(req: Request) {
   const authentication = await getRequestAuthentication(req);
@@ -26,11 +36,18 @@ export async function POST(req: Request) {
     );
   }
 
-  const { data, error } = await getAdminClient()
+  const admin = getAdminClient();
+  const { data: previous } = await admin
+    .from('trainers')
+    .select('status')
+    .eq('id', parsed.data.trainerId)
+    .maybeSingle();
+
+  const { data, error } = await admin
     .from('trainers')
     .update({ status: parsed.data.status })
     .eq('id', parsed.data.trainerId)
-    .select('id, status')
+    .select('id, status, name, email')
     .maybeSingle();
 
   if (error) {
@@ -41,5 +58,24 @@ export async function POST(req: Request) {
     return NextResponse.json({ error: 'Trainer nicht gefunden.' }, { status: 404 });
   }
 
-  return NextResponse.json({ trainer: data });
+  // Mail nur bei tatsächlicher Änderung; ein Mailfehler macht die Entscheidung nicht rückgängig.
+  if (data.email && previous?.status !== data.status) {
+    try {
+      const name = escapeHtml(data.name || 'Trainer');
+      const appUrl = process.env.NEXT_PUBLIC_APP_URL || '';
+      const approved = data.status === 'approved';
+      await getResendClient().emails.send({
+        from: process.env.RESEND_FROM_EMAIL || 'onboarding@resend.dev',
+        to: data.email,
+        subject: approved ? 'Dein VeriFit-Profil wurde freigeschaltet' : 'Dein VeriFit-Profil konnte nicht freigeschaltet werden',
+        html: approved
+          ? `<p>Hallo ${name},</p><p>dein Profil wurde geprüft und ist jetzt als <strong>verifiziert</strong> freigeschaltet. Kunden können dich ab sofort finden und buchen.</p>${appUrl ? `<p><a href="${appUrl}/trainer/login">Zum Trainer-Login</a></p>` : ''}`
+          : `<p>Hallo ${name},</p><p>dein Profil konnte leider noch nicht freigeschaltet werden. Bitte prüfe deine Angaben und hochgeladenen Dokumente (Lizenz, Berufshaftpflicht) und melde dich bei uns.</p>`,
+      });
+    } catch {
+      console.error('Statusmail an Trainer konnte nicht gesendet werden');
+    }
+  }
+
+  return NextResponse.json({ trainer: { id: data.id, status: data.status } });
 }
