@@ -4,7 +4,7 @@ import { useEffect, useState } from 'react';
 import Link from 'next/link';
 import { useParams } from 'next/navigation';
 import { supabase } from '@/app/lib/supabase';
-import { parseSpecialties } from '@/lib/trainer-dashboard/utils';
+import { parseSpecialties } from '@/lib/constants';
 import { useAuthProfile } from '@/lib/useAuthProfile';
 import { withNext } from '@/lib/nextParam';
 
