@@ -7,6 +7,7 @@ import { supabase } from '@/app/lib/supabase';
 import { resetPasswordSchema } from '@/app/lib/validation/authSchemas';
 import { FormFieldError } from '@/components/FormError';
 import { translateAuthError } from '@/lib/authErrors';
+import AuthShell from '@/components/AuthShell';
 
 export default function ResetPasswordPage() {
   const [password, setPassword] = useState('');
@@ -74,16 +75,7 @@ export default function ResetPasswordPage() {
     }`;
 
   return (
-    <main className="min-h-screen bg-slate-950 text-white flex flex-col justify-between">
-      <header className="flex justify-between items-center px-6 py-6 max-w-7xl mx-auto w-full">
-        <Link href="/" className="text-2xl font-black tracking-wider text-emerald-400">
-          VERIFIT<span className="text-white">.</span>
-        </Link>
-      </header>
-
-      <section className="flex flex-col items-center justify-center px-6 py-12 max-w-md mx-auto w-full flex-1">
-        <div className="w-full bg-slate-900 border border-slate-800 rounded-2xl p-8 shadow-2xl">
-          <h1 className="text-2xl font-extrabold mb-2 text-center">Neues Passwort festlegen</h1>
+    <AuthShell eyebrow="Kontozugang" title="Neues Passwort festlegen." description="Prüfe deinen Recovery-Link und vergib anschließend ein neues, sicheres Passwort." backHref="/login" backLabel="Zurück zum Login" notes={['Recovery-Link wird automatisch geprüft', 'Mindestens acht Zeichen', 'Anschließend erneute Anmeldung']}>
 
           {done ? (
             <div className="mt-6 p-3 bg-emerald-500/10 border border-emerald-500/20 rounded-xl text-emerald-400 text-xs">
@@ -113,14 +105,14 @@ export default function ResetPasswordPage() {
               )}
               <form onSubmit={handleSubmit} className="space-y-4" noValidate>
                 <div>
-                  <label className="block text-xs font-semibold text-slate-400 uppercase tracking-wider mb-2">Neues Passwort</label>
-                  <input type="password" autoComplete="new-password" placeholder="••••••••" value={password} onChange={(e) => setPassword(e.target.value)} className={inputClass(fieldErrors.password)} />
-                  <FormFieldError message={fieldErrors.password} />
+                  <label htmlFor="reset-password" className="block text-xs font-semibold text-slate-400 uppercase tracking-wider mb-2">Neues Passwort</label>
+                  <input id="reset-password" type="password" aria-describedby={fieldErrors.password ? 'reset-password-error' : undefined} autoComplete="new-password" placeholder="••••••••" value={password} onChange={(e) => setPassword(e.target.value)} className={inputClass(fieldErrors.password)} />
+                  <FormFieldError id="reset-password-error" message={fieldErrors.password} />
                 </div>
                 <div>
-                  <label className="block text-xs font-semibold text-slate-400 uppercase tracking-wider mb-2">Passwort bestätigen</label>
-                  <input type="password" autoComplete="new-password" placeholder="••••••••" value={confirmPassword} onChange={(e) => setConfirmPassword(e.target.value)} className={inputClass(fieldErrors.confirmPassword)} />
-                  <FormFieldError message={fieldErrors.confirmPassword} />
+                  <label htmlFor="reset-password-confirm" className="block text-xs font-semibold text-slate-400 uppercase tracking-wider mb-2">Passwort bestätigen</label>
+                  <input id="reset-password-confirm" type="password" aria-describedby={fieldErrors.confirmPassword ? 'reset-password-confirm-error' : undefined} autoComplete="new-password" placeholder="••••••••" value={confirmPassword} onChange={(e) => setConfirmPassword(e.target.value)} className={inputClass(fieldErrors.confirmPassword)} />
+                  <FormFieldError id="reset-password-confirm-error" message={fieldErrors.confirmPassword} />
                 </div>
                 <button
                   type="submit"
@@ -132,12 +124,6 @@ export default function ResetPasswordPage() {
               </form>
             </>
           )}
-        </div>
-      </section>
-
-      <footer className="border-t border-slate-900 py-6 text-center text-xs text-slate-600 max-w-7xl mx-auto w-full">
-        &copy; {new Date().getFullYear()} VeriFit. Alle Rechte vorbehalten.
-      </footer>
-    </main>
+    </AuthShell>
   );
 }

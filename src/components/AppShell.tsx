@@ -5,6 +5,7 @@ import { usePathname, useRouter } from 'next/navigation';
 import { ExternalLink, LayoutDashboard, LogOut, MessageSquare, Search, Sparkles, Users } from 'lucide-react';
 import type { LucideIcon } from 'lucide-react';
 import { supabase } from '@/app/lib/supabase';
+import BrandMark from '@/components/BrandMark';
 import { useAuthProfile } from '@/lib/useAuthProfile';
 
 type NavItem = { href: string; label: string; icon: LucideIcon; mobile?: boolean };
@@ -61,13 +62,11 @@ export default function AppShell({ children }: { children: React.ReactNode }) {
   return (
     <>
       {showNav && (
-        <aside className="hidden md:flex fixed inset-y-0 left-0 w-60 flex-col bg-slate-950 border-r border-slate-900 z-30 p-4">
-          <Link href="/" className="text-xl font-black tracking-wider text-emerald-400 px-2 py-3">
-            VERIFIT<span className="text-white">.</span>
-          </Link>
-          <p className="px-2 pb-4 text-[11px] text-slate-500">{role === 'trainer' ? 'Expert Hub' : 'Kunden-Portal'}</p>
+        <aside className="fixed inset-y-0 left-0 z-30 hidden w-64 flex-col border-r border-line bg-canvas px-4 py-5 md:flex">
+          <BrandMark className="px-2 py-2 text-xl" />
+          <p className="px-2 pb-6 pt-1 text-xs font-medium text-slate-500">{role === 'trainer' ? 'Trainerbereich' : 'Kundenbereich'}</p>
 
-          <nav className="flex-1 space-y-1 overflow-y-auto">
+          <nav className="flex-1 space-y-1 overflow-y-auto" aria-label="Bereichsnavigation">
             {items.map((item) => {
               const Icon = item.icon;
               const active = isActive(item.href);
@@ -75,11 +74,12 @@ export default function AppShell({ children }: { children: React.ReactNode }) {
                 <Link
                   key={item.href}
                   href={item.href}
-                  className={`flex items-center gap-3 px-3 py-2.5 rounded-xl text-sm font-medium transition ${
+                  className={`flex min-h-11 items-center gap-3 rounded-lg border-l-2 px-3 py-2.5 text-sm font-medium transition-colors ${
                     active
-                      ? 'bg-emerald-500/10 text-emerald-400 border border-emerald-500/20'
-                      : 'text-slate-400 hover:text-white hover:bg-slate-900 border border-transparent'
-                  }`}
+                      ? 'border-emerald-400 bg-slate-900 text-white'
+                      : 'border-transparent text-slate-400 hover:bg-slate-900/70 hover:text-white'
+                  } focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-emerald-400`}
+                  aria-current={active ? 'page' : undefined}
                 >
                   <Icon size={16} />
                   {item.label}
@@ -88,12 +88,12 @@ export default function AppShell({ children }: { children: React.ReactNode }) {
             })}
           </nav>
 
-          <div className="border-t border-slate-900 pt-3 space-y-2">
-            {auth.email && <p className="px-2 text-[11px] text-slate-500 truncate">{auth.email}</p>}
+          <div className="space-y-2 border-t border-line pt-4">
+            {auth.email && <p className="truncate px-2 text-xs text-slate-500">{auth.email}</p>}
             <button
               type="button"
               onClick={handleLogout}
-              className="w-full flex items-center gap-3 px-3 py-2.5 rounded-xl text-sm font-medium text-slate-400 hover:text-white hover:bg-slate-900 transition cursor-pointer"
+              className="flex min-h-11 w-full cursor-pointer items-center gap-3 rounded-lg px-3 py-2.5 text-sm font-medium text-slate-400 transition-colors hover:bg-slate-900 hover:text-white"
             >
               <LogOut size={16} />
               Abmelden
@@ -102,10 +102,10 @@ export default function AppShell({ children }: { children: React.ReactNode }) {
         </aside>
       )}
 
-      <div className={`flex flex-1 flex-col min-w-0 ${showNav ? 'md:pl-60 pb-20 md:pb-0' : ''}`}>{children}</div>
+      <div className={`flex min-w-0 flex-1 flex-col ${showNav ? 'pb-20 md:pb-0 md:pl-64' : ''}`}>{children}</div>
 
       {showNav && (
-        <nav className="md:hidden fixed bottom-0 inset-x-0 z-30 bg-slate-950/95 backdrop-blur border-t border-slate-900 flex items-stretch justify-around px-1 py-1.5">
+        <nav className="fixed inset-x-0 bottom-0 z-30 flex items-stretch justify-around border-t border-line bg-canvas px-1 py-1.5 md:hidden" aria-label="Mobile Bereichsnavigation">
           {items
             .filter((item) => item.mobile)
             .map((item) => {
@@ -115,9 +115,10 @@ export default function AppShell({ children }: { children: React.ReactNode }) {
                 <Link
                   key={item.href}
                   href={item.href}
-                  className={`flex flex-1 flex-col items-center gap-0.5 py-1.5 rounded-lg text-[10px] font-medium ${
+                  className={`flex min-h-12 flex-1 flex-col items-center justify-center gap-0.5 rounded-lg py-1.5 text-xs font-medium ${
                     active ? 'text-emerald-400' : 'text-slate-400'
-                  }`}
+                  } focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-emerald-400`}
+                  aria-current={active ? 'page' : undefined}
                 >
                   <Icon size={18} />
                   <span className="truncate max-w-full px-1">{item.label}</span>
@@ -127,7 +128,7 @@ export default function AppShell({ children }: { children: React.ReactNode }) {
           <button
             type="button"
             onClick={handleLogout}
-            className="flex flex-1 flex-col items-center gap-0.5 py-1.5 text-[10px] font-medium text-slate-400 cursor-pointer"
+            className="flex min-h-12 flex-1 cursor-pointer flex-col items-center justify-center gap-0.5 py-1.5 text-xs font-medium text-slate-400"
           >
             <LogOut size={18} />
             Abmelden

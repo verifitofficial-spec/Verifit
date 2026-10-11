@@ -8,6 +8,7 @@ import { loginSchema } from '@/app/lib/validation/authSchemas';
 import { FormFieldError } from '@/components/FormError';
 import { translateAuthError } from '@/lib/authErrors';
 import { useNextParam, withNext } from '@/lib/nextParam';
+import AuthShell from '@/components/AuthShell';
 
 function ClientLoginForm() {
   const [email, setEmail] = useState('');
@@ -99,22 +100,7 @@ function ClientLoginForm() {
   }
 
   return (
-    <main className="min-h-screen bg-slate-950 text-white flex flex-col justify-between">
-      <header className="flex justify-between items-center px-6 py-6 max-w-7xl mx-auto w-full">
-        <Link href="/" className="text-2xl font-black tracking-wider text-emerald-400">
-          VERIFIT<span className="text-white">.</span>
-        </Link>
-        <Link href="/" className="text-sm font-medium text-slate-300 hover:text-white transition">
-          &larr; Zurück zur Startseite
-        </Link>
-      </header>
-
-      <section className="flex flex-col items-center justify-center px-6 py-12 max-w-md mx-auto w-full flex-1">
-        <div className="w-full bg-slate-900 border border-slate-800 rounded-2xl p-8 shadow-2xl">
-          <h1 className="text-2xl font-extrabold mb-2 text-center">Kunden-Login</h1>
-          <p className="text-slate-400 text-sm text-center mb-6">
-            {next ? 'Melde dich an, um deine Buchung fortzusetzen.' : 'Gib deine E-Mail und dein Passwort ein.'}
-          </p>
+    <AuthShell eyebrow="Kundenbereich" title="Willkommen zurück." description={next ? 'Melde dich an, um deine ausgewählte Buchung fortzusetzen.' : 'Melde dich an und behalte Termine, Pläne und Fortschritte an einem Ort im Blick.'}>
 
           {errorMessage && (
             <div className="mb-4 p-3 bg-red-500/10 border border-red-500/20 rounded-xl text-red-400 text-xs space-y-2">
@@ -134,11 +120,13 @@ function ClientLoginForm() {
 
           <form onSubmit={handleLogin} className="space-y-4" noValidate>
             <div>
-              <label className="block text-xs font-semibold text-slate-400 uppercase tracking-wider mb-2">
+              <label htmlFor="client-login-email" className="block text-xs font-semibold text-slate-400 uppercase tracking-wider mb-2">
                 E-Mail-Adresse
               </label>
               <input
+                id="client-login-email"
                 type="email"
+                aria-describedby={fieldErrors.email ? 'client-login-email-error' : undefined}
                 autoComplete="email"
                 placeholder="name@example.com"
                 value={email}
@@ -147,14 +135,16 @@ function ClientLoginForm() {
                   fieldErrors.email ? 'border-red-500/60 focus:border-red-500' : 'border-slate-800 focus:border-emerald-500'
                 }`}
               />
-              <FormFieldError message={fieldErrors.email} />
+              <FormFieldError id="client-login-email-error" message={fieldErrors.email} />
             </div>
             <div>
-              <label className="block text-xs font-semibold text-slate-400 uppercase tracking-wider mb-2">
+              <label htmlFor="client-login-password" className="block text-xs font-semibold text-slate-400 uppercase tracking-wider mb-2">
                 Passwort
               </label>
               <input
+                id="client-login-password"
                 type="password"
+                aria-describedby={fieldErrors.password ? 'client-login-password-error' : undefined}
                 autoComplete="current-password"
                 placeholder="••••••••"
                 value={password}
@@ -163,7 +153,7 @@ function ClientLoginForm() {
                   fieldErrors.password ? 'border-red-500/60 focus:border-red-500' : 'border-slate-800 focus:border-emerald-500'
                 }`}
               />
-              <FormFieldError message={fieldErrors.password} />
+              <FormFieldError id="client-login-password-error" message={fieldErrors.password} />
               <div className="text-right mt-2">
                 <Link href="/forgot-password" className="text-xs text-slate-400 hover:text-emerald-400 transition">
                   Passwort vergessen?
@@ -185,13 +175,7 @@ function ClientLoginForm() {
               Jetzt registrieren
             </Link>
           </div>
-        </div>
-      </section>
-
-      <footer className="border-t border-slate-900 py-6 text-center text-xs text-slate-600 max-w-7xl mx-auto w-full">
-        &copy; {new Date().getFullYear()} VeriFit. Alle Rechte vorbehalten.
-      </footer>
-    </main>
+    </AuthShell>
   );
 }
 

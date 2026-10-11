@@ -60,7 +60,7 @@ export default function OfferModal({ initial, editing, onClose, onSubmit }: Prop
               onClick={() => setDraft({ ...draft, type: 'paid', price: draft.price > 0 ? draft.price : 90 })}
               className={`py-2 rounded-xl text-xs font-bold transition cursor-pointer border ${
                 !isDiscovery
-                  ? 'bg-indigo-500/20 border-indigo-500 text-indigo-400'
+                  ? 'bg-slate-700 border-slate-500 text-white'
                   : 'bg-slate-950 border-slate-800 text-slate-500 hover:text-slate-300'
               }`}
             >

@@ -44,13 +44,14 @@ export default function WorkoutPlanner({ trainerId, clients }: { trainerId: stri
 
         <PlannerCalendar
           title="Monatsplan Kalender"
-          hint="Ziehe ein Template aus der Leiste auf den gewünschten Tag."
+          hint="Ziehe eine Vorlage auf einen Tag oder nutze die Auswahlfelder."
           schedule={planner.schedule}
+          templates={planner.templates.map((template) => template.templateName)}
           onAssign={planner.assignDate}
           onRemove={planner.unassignDate}
         />
 
-        <div className="bg-slate-950/60 p-5 rounded-2xl border border-slate-800/80 space-y-4">
+        <div className="border-t border-slate-800 pt-6 space-y-4">
           <TemplateBar
             defaults={DEFAULT_NAMES}
             customs={planner.templates.map((t) => t.templateName)}

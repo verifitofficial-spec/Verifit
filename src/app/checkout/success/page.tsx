@@ -3,9 +3,12 @@
 import { Suspense, useEffect, useState } from 'react';
 import Link from 'next/link';
 import { useSearchParams } from 'next/navigation';
-import { CheckCircle2 } from 'lucide-react';
+import { CheckCircle2, CircleAlert, Clock3 } from 'lucide-react';
 import { supabase } from '@/app/lib/supabase';
 import { useAuthProfile } from '@/lib/useAuthProfile';
+import BrandMark from '@/components/BrandMark';
+import Footer from '@/components/Footer';
+import { SkeletonBlock } from '@/components/Skeleton';
 
 type State = 'checking' | 'confirmed' | 'processing' | 'error';
 
@@ -59,28 +62,28 @@ function SuccessContent() {
 
   return (
     <main className="min-h-screen bg-slate-950 text-white flex flex-col justify-between">
-      <header className="flex justify-between items-center px-6 py-6 max-w-7xl mx-auto w-full">
-        <Link href="/" className="text-2xl font-black tracking-wider text-emerald-400">
-          VERIFIT<span className="text-white">.</span>
-        </Link>
+      <header className="flex items-center px-6 py-6 max-w-7xl mx-auto w-full">
+        <BrandMark />
       </header>
 
-      <section className="max-w-xl mx-auto px-6 py-20 w-full flex-1 flex flex-col items-center text-center justify-center space-y-6">
+      <section className="max-w-3xl mx-auto px-6 py-20 w-full flex-1 flex flex-col items-start justify-center space-y-7">
         {state === 'checking' && (
           <>
-            <div className="w-10 h-10 border-4 border-emerald-500 border-t-transparent rounded-full animate-spin" />
-            <h1 className="text-2xl font-black tracking-tight">Zahlung wird bestätigt...</h1>
-            <p className="text-slate-400 text-sm">Einen Moment bitte, wir prüfen deine Zahlung bei Stripe.</p>
+            <p className="text-xs font-bold uppercase tracking-[0.22em] text-emerald-400">Zahlungsstatus</p>
+            <SkeletonBlock className="h-12 w-3/4" />
+            <SkeletonBlock className="h-5 w-full max-w-xl" />
+            <p className="sr-only" aria-live="polite">Zahlung wird bestätigt. Wir prüfen deine Zahlung bei Stripe.</p>
           </>
         )}
 
         {state === 'confirmed' && (
           <>
-            <div className="w-16 h-16 rounded-2xl bg-emerald-500/10 border border-emerald-500/30 flex items-center justify-center text-emerald-400">
+            <div className="flex items-center gap-3 text-emerald-400">
               <CheckCircle2 size={32} />
+              <span className="text-xs font-bold uppercase tracking-[0.22em]">Bestätigt</span>
             </div>
-            <h1 className="text-3xl md:text-4xl font-black tracking-tight">Buchung erfolgreich!</h1>
-            <p className="text-slate-400 text-sm md:text-base">
+            <h1 className="text-4xl md:text-6xl font-black tracking-tight">Dein Termin steht.</h1>
+            <p className="max-w-xl text-slate-400 text-sm md:text-base leading-7">
               Deine Zahlung wurde bestätigt und dein Termin ist reserviert. Du erhältst in Kürze eine Bestätigungsmail mit allen Details.
             </p>
           </>
@@ -88,8 +91,9 @@ function SuccessContent() {
 
         {state === 'processing' && (
           <>
-            <h1 className="text-2xl font-black tracking-tight">Zahlung wird verarbeitet</h1>
-            <p className="text-slate-400 text-sm">
+            <Clock3 className="h-8 w-8 text-amber-400" aria-hidden="true" />
+            <h1 className="text-4xl md:text-6xl font-black tracking-tight">Zahlung wird verarbeitet.</h1>
+            <p className="max-w-xl text-slate-400 text-sm leading-7">
               Deine Zahlung ist bei uns eingegangen, die Bestätigung dauert noch einen Moment. Den aktuellen Status siehst du in deinem Dashboard unter „Deine Buchungen“.
             </p>
           </>
@@ -97,8 +101,9 @@ function SuccessContent() {
 
         {state === 'error' && (
           <>
-            <h1 className="text-2xl font-black tracking-tight">Bitte melde dich an</h1>
-            <p className="text-slate-400 text-sm">
+            <CircleAlert className="h-8 w-8 text-amber-400" aria-hidden="true" />
+            <h1 className="text-4xl md:text-6xl font-black tracking-tight">Bitte melde dich an.</h1>
+            <p className="max-w-xl text-slate-400 text-sm leading-7">
               Wir konnten deine Sitzung nicht finden. Nach dem Login siehst du den Status deiner Buchung im Dashboard.
             </p>
           </>
@@ -120,9 +125,7 @@ function SuccessContent() {
         </div>
       </section>
 
-      <footer className="border-t border-slate-900 py-6 text-center text-xs text-slate-600 max-w-7xl mx-auto w-full">
-        &copy; {new Date().getFullYear()} VeriFit. Alle Rechte vorbehalten.
-      </footer>
+      <Footer />
     </main>
   );
 }

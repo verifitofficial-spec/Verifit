@@ -8,6 +8,7 @@ import { registerSchema } from '@/app/lib/validation/authSchemas';
 import { FormFieldError } from '@/components/FormError';
 import { translateAuthError } from '@/lib/authErrors';
 import { useNextParam, withNext } from '@/lib/nextParam';
+import AuthShell from '@/components/AuthShell';
 
 type FieldErrors = {
   name?: string;
@@ -109,22 +110,7 @@ function ClientRegisterForm() {
   const labelClass = 'block text-xs font-semibold text-slate-400 uppercase tracking-wider mb-2';
 
   return (
-    <main className="min-h-screen bg-slate-950 text-white flex flex-col justify-between">
-      <header className="flex justify-between items-center px-6 py-6 max-w-7xl mx-auto w-full">
-        <Link href="/" className="text-2xl font-black tracking-wider text-emerald-400">
-          VERIFIT<span className="text-white">.</span>
-        </Link>
-        <Link href="/" className="text-sm font-medium text-slate-300 hover:text-white transition">
-          &larr; Zurück zur Startseite
-        </Link>
-      </header>
-
-      <section className="flex flex-col items-center justify-center px-6 py-12 max-w-md mx-auto w-full flex-1">
-        <div className="w-full bg-slate-900 border border-slate-800 rounded-2xl p-8 shadow-2xl">
-          <h1 className="text-2xl font-extrabold mb-2 text-center">Kunden-Registrierung</h1>
-          <p className="text-slate-400 text-sm text-center mb-6">
-            {next ? 'Erstelle dein Konto, um deine Buchung abzuschließen.' : 'Erstelle dein Konto, um Termine zu buchen.'}
-          </p>
+    <AuthShell eyebrow="Kundenkonto" title="Dein Training beginnt mit Klarheit." description={next ? 'Erstelle dein Konto und schließe danach deine ausgewählte Buchung ab.' : 'Erstelle dein Konto, finde passende Expertise und bündele Termine, Pläne und Fortschritte.'}>
 
           {errorMessage && (
             <div className="mb-4 p-3 bg-red-500/10 border border-red-500/20 rounded-xl text-red-400 text-xs">
@@ -144,24 +130,24 @@ function ClientRegisterForm() {
 
           <form onSubmit={handleRegister} className="space-y-4" noValidate>
             <div>
-              <label className={labelClass}>Vollständiger Name</label>
-              <input type="text" autoComplete="name" placeholder="Max Mustermann" value={name} onChange={(e) => setName(e.target.value)} className={inputClass(fieldErrors.name)} />
-              <FormFieldError message={fieldErrors.name} />
+              <label htmlFor="client-register-name" className={labelClass}>Vollständiger Name</label>
+              <input id="client-register-name" type="text" aria-describedby={fieldErrors.name ? 'client-register-name-error' : undefined} autoComplete="name" placeholder="Max Mustermann" value={name} onChange={(e) => setName(e.target.value)} className={inputClass(fieldErrors.name)} />
+              <FormFieldError id="client-register-name-error" message={fieldErrors.name} />
             </div>
             <div>
-              <label className={labelClass}>E-Mail-Adresse</label>
-              <input type="email" autoComplete="email" placeholder="name@example.com" value={email} onChange={(e) => setEmail(e.target.value)} className={inputClass(fieldErrors.email)} />
-              <FormFieldError message={fieldErrors.email} />
+              <label htmlFor="client-register-email" className={labelClass}>E-Mail-Adresse</label>
+              <input id="client-register-email" type="email" aria-describedby={fieldErrors.email ? 'client-register-email-error' : undefined} autoComplete="email" placeholder="name@example.com" value={email} onChange={(e) => setEmail(e.target.value)} className={inputClass(fieldErrors.email)} />
+              <FormFieldError id="client-register-email-error" message={fieldErrors.email} />
             </div>
             <div>
-              <label className={labelClass}>Passwort (mind. 8 Zeichen)</label>
-              <input type="password" autoComplete="new-password" placeholder="••••••••" value={password} onChange={(e) => setPassword(e.target.value)} className={inputClass(fieldErrors.password)} />
-              <FormFieldError message={fieldErrors.password} />
+              <label htmlFor="client-register-password" className={labelClass}>Passwort (mind. 8 Zeichen)</label>
+              <input id="client-register-password" type="password" aria-describedby={fieldErrors.password ? 'client-register-password-error' : undefined} autoComplete="new-password" placeholder="••••••••" value={password} onChange={(e) => setPassword(e.target.value)} className={inputClass(fieldErrors.password)} />
+              <FormFieldError id="client-register-password-error" message={fieldErrors.password} />
             </div>
             <div>
-              <label className={labelClass}>Passwort bestätigen</label>
-              <input type="password" autoComplete="new-password" placeholder="••••••••" value={confirmPassword} onChange={(e) => setConfirmPassword(e.target.value)} className={inputClass(fieldErrors.confirmPassword)} />
-              <FormFieldError message={fieldErrors.confirmPassword} />
+              <label htmlFor="client-register-confirm-password" className={labelClass}>Passwort bestätigen</label>
+              <input id="client-register-confirm-password" type="password" aria-describedby={fieldErrors.confirmPassword ? 'client-register-confirm-password-error' : undefined} autoComplete="new-password" placeholder="••••••••" value={confirmPassword} onChange={(e) => setConfirmPassword(e.target.value)} className={inputClass(fieldErrors.confirmPassword)} />
+              <FormFieldError id="client-register-confirm-password-error" message={fieldErrors.confirmPassword} />
             </div>
 
             <div className="space-y-3 pt-2">
@@ -170,6 +156,7 @@ function ClientRegisterForm() {
                   <input
                     type="checkbox"
                     id="healthDataConsent"
+                    aria-describedby={fieldErrors.healthConsent ? 'client-register-health-consent-error' : undefined}
                     checked={healthConsent}
                     onChange={(e) => setHealthConsent(e.target.checked)}
                     className="mt-1 w-4 h-4 rounded border-slate-700 bg-slate-950 text-emerald-500 focus:ring-emerald-500 cursor-pointer"
@@ -178,7 +165,7 @@ function ClientRegisterForm() {
                     Ich willige ausdrücklich ein, dass meine sensiblen Gesundheitsdaten (wie Körpergewicht, Stimmung, Schlaf) zur Auswertung und Anpassung meiner Trainingsziele durch VeriFit und verbundene Trainer verarbeitet werden (gemäß Art. 9 DSGVO). Diese Einwilligung kann ich jederzeit widerrufen.
                   </label>
                 </div>
-                <FormFieldError message={fieldErrors.healthConsent} />
+                <FormFieldError id="client-register-health-consent-error" message={fieldErrors.healthConsent} />
               </div>
 
               <div>
@@ -186,6 +173,7 @@ function ClientRegisterForm() {
                   <input
                     type="checkbox"
                     id="termsConsent"
+                    aria-describedby={fieldErrors.terms ? 'client-register-terms-error' : undefined}
                     checked={terms}
                     onChange={(e) => setTerms(e.target.checked)}
                     className="mt-1 w-4 h-4 rounded border-slate-700 bg-slate-950 text-emerald-500 focus:ring-emerald-500 cursor-pointer"
@@ -197,7 +185,7 @@ function ClientRegisterForm() {
                     gelesen und akzeptiere sie.
                   </label>
                 </div>
-                <FormFieldError message={fieldErrors.terms} />
+                <FormFieldError id="client-register-terms-error" message={fieldErrors.terms} />
               </div>
             </div>
 
@@ -216,18 +204,7 @@ function ClientRegisterForm() {
               Jetzt anmelden
             </Link>
           </div>
-        </div>
-      </section>
-
-      <footer className="border-t border-slate-900 py-6 text-center text-xs text-slate-500 max-w-7xl mx-auto w-full space-y-2">
-        <p>&copy; {new Date().getFullYear()} VeriFit. Alle Rechte vorbehalten.</p>
-        <div className="flex justify-center items-center gap-4">
-          <Link href="/impressum" className="hover:text-emerald-400 transition">Impressum</Link>
-          <Link href="/datenschutz" className="hover:text-emerald-400 transition">Datenschutz</Link>
-          <Link href="/agb" className="hover:text-emerald-400 transition">AGB</Link>
-        </div>
-      </footer>
-    </main>
+    </AuthShell>
   );
 }
 

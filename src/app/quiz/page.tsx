@@ -3,7 +3,11 @@
 import { useEffect, useMemo, useState } from 'react';
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
+import { ArrowLeft, ArrowRight, BadgeCheck, CalendarDays, MapPin, RotateCcw } from 'lucide-react';
 import { supabase } from '@/app/lib/supabase';
+import BrandMark from '@/components/BrandMark';
+import Footer from '@/components/Footer';
+import { SkeletonBlock } from '@/components/Skeleton';
 import { SPECIALTY_CATEGORIES, parseSpecialties } from '@/lib/constants';
 import { useAuthProfile } from '@/lib/useAuthProfile';
 
@@ -74,13 +78,14 @@ function filterTrainers(list: QuizTrainer[], answers: QuizAnswers, withBudget: b
 }
 
 const optionBtn =
-  'p-4 bg-slate-900 hover:bg-slate-800 border border-slate-800 hover:border-emerald-500 rounded-2xl text-left font-semibold text-sm transition cursor-pointer flex justify-between items-center group';
+  'group flex min-h-14 w-full cursor-pointer items-center justify-between gap-4 border-t border-slate-800 px-1 py-4 text-left text-sm font-semibold text-white transition-colors hover:border-emerald-500 hover:text-emerald-300';
 
 export default function QuizPage() {
   const router = useRouter();
   const auth = useAuthProfile();
   const [trainers, setTrainers] = useState<QuizTrainer[]>([]);
   const [loading, setLoading] = useState(true);
+  const [loadError, setLoadError] = useState(false);
   const [view, setView] = useState<'quiz' | 'results'>('quiz');
   const [step, setStep] = useState(1);
   const [answers, setAnswers] = useState<QuizAnswers>(EMPTY_ANSWERS);
@@ -99,6 +104,7 @@ export default function QuizPage() {
 
       if (trainerRes.error) {
         console.error('Fehler beim Laden der Trainer:', trainerRes.error.message);
+        setLoadError(true);
         setLoading(false);
         return;
       }
@@ -170,70 +176,101 @@ export default function QuizPage() {
 
   const { t1, t2 } = budgetThresholds(priceRange);
   const homeLabel = auth.homeHref ? 'Zum Dashboard' : 'Quiz verlassen';
+  const questionTitles = [
+    'Wie stufst du dein aktuelles Fitness-Level ein?',
+    'Was ist dein primäres Trainingsziel?',
+    'Wie möchtest du trainieren?',
+    'Welches Budget passt zu deiner Planung?',
+  ];
 
   return (
-    <main className="min-h-screen bg-slate-950 text-white flex flex-col justify-between">
-      <header className="flex justify-between items-center px-6 py-6 max-w-7xl mx-auto w-full">
-        <Link href="/" className="text-2xl font-black tracking-wider text-emerald-400">
-          VERIFIT<span className="text-white">.</span>
-        </Link>
-        <div className="flex items-center gap-4">
-          {view === 'quiz' && <span className="text-xs text-slate-400 font-medium">Schritt {step} von 4</span>}
+    <main className="flex min-h-screen flex-col justify-between bg-canvas text-ink">
+      <header className="border-b border-line bg-canvas">
+        <div className="mx-auto flex w-full max-w-7xl items-center justify-between gap-4 px-5 py-5 sm:px-8 lg:px-10">
+          <BrandMark className="text-xl sm:text-2xl" />
+          <div className="flex items-center gap-3">
+            {view === 'quiz' && <span className="hidden text-sm font-medium text-slate-400 sm:inline">Schritt {step} von 4</span>}
           <button
+            type="button"
             onClick={() => router.push(auth.homeHref ?? '/')}
-            className="text-xs bg-slate-900 border border-slate-800 hover:bg-slate-800 text-slate-300 px-3 py-1.5 rounded-xl transition cursor-pointer"
+            className="inline-flex min-h-10 cursor-pointer items-center gap-2 rounded-lg border border-slate-700 bg-slate-900 px-3 py-2 text-sm font-medium text-slate-300 transition-colors hover:bg-slate-800 hover:text-white"
           >
+            <ArrowLeft size={15} aria-hidden />
             {homeLabel}
           </button>
+          </div>
         </div>
       </header>
 
-      <section className="max-w-3xl mx-auto px-6 py-12 w-full flex-1 flex flex-col justify-center">
+      <section className="mx-auto flex w-full max-w-7xl flex-1 px-5 py-12 sm:px-8 sm:py-16 lg:px-10">
         {view === 'quiz' ? (
-          <div className="space-y-8">
-            <div className="text-center space-y-3">
-              <span className="bg-emerald-500/10 text-emerald-400 border border-emerald-500/20 px-3 py-1 rounded-full text-xs font-semibold uppercase tracking-wider">
-                Geprüfte Qualität & Radikale Transparenz
-              </span>
-              <h1 className="text-3xl md:text-4xl font-black tracking-tight">
-                {step === 1 && 'Wie stufst du dein aktuelles Fitness-Level ein?'}
-                {step === 2 && 'Was ist dein primäres Trainingsziel?'}
-                {step === 3 && 'Wie möchtest du trainieren?'}
-                {step === 4 && 'Welches Budget passt zu deiner Planung?'}
+          <div className="grid w-full gap-10 lg:grid-cols-[0.65fr_1.35fr] lg:gap-20">
+            <aside className="lg:pt-3">
+              <p className="text-sm font-semibold text-emerald-400">Persönliches Matching</p>
+              <p className="mt-4 max-w-sm text-sm leading-6 text-slate-400">
+                Vier Angaben helfen dabei, freigeschaltete Trainer nach deinem Ziel und deinen Rahmenbedingungen zu sortieren.
+              </p>
+              <div className="mt-8 grid grid-cols-4 gap-2" aria-label={`Schritt ${step} von 4`}>
+                {[1, 2, 3, 4].map((progressStep) => (
+                  <span
+                    key={progressStep}
+                    className={`h-1 rounded-full ${progressStep <= step ? 'bg-emerald-400' : 'bg-slate-800'}`}
+                    aria-hidden
+                  />
+                ))}
+              </div>
+              <dl className="mt-8 space-y-4 border-t border-slate-800 pt-6 text-sm">
+                {answers.experience && <div><dt className="text-slate-500">Erfahrung</dt><dd className="mt-1 text-slate-200">{answers.experience}</dd></div>}
+                {answers.goal && <div><dt className="text-slate-500">Ziel</dt><dd className="mt-1 text-slate-200">{answers.goal}</dd></div>}
+                {answers.mode && <div><dt className="text-slate-500">Trainingsform</dt><dd className="mt-1 text-slate-200">{answers.mode}</dd></div>}
+              </dl>
+            </aside>
+
+            <div>
+              <p className="font-mono text-sm text-emerald-400 tabular-nums">0{step} / 04</p>
+              <h1 className="mt-4 max-w-3xl text-balance text-3xl font-semibold tracking-[-0.03em] sm:text-4xl lg:text-5xl">
+                {questionTitles[step - 1]}
               </h1>
               {step === 4 && (
-                <p className="text-slate-400 text-xs">
-                  Basierend auf deinen Angaben liegt die verfügbare Spanne unserer Coaches bei ca. {Math.round(priceRange.min)} € – {Math.round(priceRange.max)} €.
+                <p className="mt-5 max-w-2xl text-sm leading-6 text-slate-400 tabular-nums">
+                  Basierend auf den aktuell hinterlegten Angeboten liegt die verfügbare Spanne bei etwa {Math.round(priceRange.min)} € bis {Math.round(priceRange.max)} €.
                 </p>
               )}
-            </div>
 
             {step === 1 && (
-              <div className="grid grid-cols-1 gap-3 max-w-xl mx-auto w-full pt-4">
+              <div className="mt-10 border-b border-slate-800">
                 {[
                   { label: 'Leistungssportler / Profi', val: 'Profi' },
                   { label: 'Fortgeschritten (trainiere regelmäßig & zielgerichtet)', val: 'Fortgeschritten' },
                   { label: 'Anfänger / Wiedereinsteiger', val: 'Anfänger' },
-                ].map((opt) => (
+                ].map((opt, index) => (
                   <button key={opt.val} onClick={() => handleSelectOption('experience', opt.val)} className={optionBtn}>
-                    <span className="group-hover:text-emerald-400 transition">{opt.label}</span>
-                    <span className="text-emerald-400">&rarr;</span>
+                    <span className="flex items-center gap-4"><span className="font-mono text-xs text-slate-500">0{index + 1}</span>{opt.label}</span>
+                    <ArrowRight size={17} className="text-emerald-400" aria-hidden />
                   </button>
                 ))}
               </div>
             )}
 
             {step === 2 && (
-              <div className="space-y-6 max-w-xl mx-auto w-full pt-2">
+              <div className="mt-10 space-y-8">
                 {loading ? (
-                  <p className="text-center text-slate-400 text-sm">Lade verfügbare Fachgebiete...</p>
+                  <div className="space-y-3" aria-label="Verfügbare Fachgebiete werden geladen">
+                    <SkeletonBlock className="h-14 w-full" />
+                    <SkeletonBlock className="h-14 w-full" />
+                    <SkeletonBlock className="h-14 w-full" />
+                  </div>
+                ) : loadError ? (
+                  <div role="alert" className="border-y border-red-500/25 bg-red-500/5 py-6 text-sm text-red-300">
+                    Die verfügbaren Fachgebiete konnten nicht geladen werden. Bitte lade die Seite erneut.
+                  </div>
                 ) : availableGoals.size === 0 ? (
-                  <p className="text-center text-slate-400 text-sm">Aktuell sind noch keine verifizierten Trainer verfügbar.</p>
+                  <p className="border-y border-slate-800 py-6 text-sm text-slate-400">Aktuell sind noch keine verifizierten Trainer verfügbar.</p>
                 ) : (
                   SPECIALTY_CATEGORIES.map((block) => (
-                    <div key={block.category} className="space-y-2">
-                      <h3 className="text-xs font-bold uppercase tracking-wider text-slate-500 px-1">{block.category}</h3>
-                      <div className="grid grid-cols-1 gap-2">
+                    <div key={block.category}>
+                      <h2 className="mb-2 text-xs font-semibold uppercase tracking-[0.16em] text-slate-500">{block.category}</h2>
+                      <div className="border-b border-slate-800">
                         {block.items.map((item) => {
                           const available = availableGoals.has(item);
                           return (
@@ -241,19 +278,17 @@ export default function QuizPage() {
                               key={item}
                               disabled={!available}
                               onClick={() => available && handleSelectOption('goal', item)}
-                              className={`p-3.5 rounded-2xl text-left font-semibold text-sm transition flex justify-between items-center border ${
+                              className={`flex min-h-14 w-full items-center justify-between gap-4 border-t px-1 py-4 text-left text-sm font-semibold transition-colors ${
                                 available
-                                  ? 'bg-slate-900 hover:bg-slate-800 border-slate-800 hover:border-emerald-500 text-white cursor-pointer group'
-                                  : 'bg-slate-950/60 border-slate-900 text-slate-600 cursor-not-allowed opacity-60'
+                                  ? 'cursor-pointer border-slate-800 text-white hover:border-emerald-500 hover:text-emerald-300'
+                                  : 'cursor-not-allowed border-slate-900 text-slate-600'
                               }`}
                             >
-                              <span className={available ? 'group-hover:text-emerald-400 transition' : ''}>{item}</span>
+                              <span>{item}</span>
                               {available ? (
-                                <span className="text-emerald-400">&rarr;</span>
+                                <ArrowRight size={17} className="text-emerald-400" aria-hidden />
                               ) : (
-                                <span className="text-[10px] bg-slate-900 px-2 py-0.5 rounded text-slate-600 uppercase tracking-widest border border-slate-800">
-                                  Zur Zeit nicht verfügbar
-                                </span>
+                                <span className="text-xs font-medium text-slate-600">Zurzeit nicht verfügbar</span>
                               )}
                             </button>
                           );
@@ -266,117 +301,113 @@ export default function QuizPage() {
             )}
 
             {step === 3 && (
-              <div className="grid grid-cols-1 gap-3 max-w-xl mx-auto w-full pt-4">
+              <div className="mt-10 border-b border-slate-800">
                 {[
                   { label: 'Vor Ort (Personal Training / Studio)', val: 'Vor Ort' },
                   { label: 'Online-Coaching (Digital & App-basiert)', val: 'Online' },
                   { label: 'Hybrid (Kombination aus beidem)', val: 'Hybrid' },
-                ].map((opt) => (
+                ].map((opt, index) => (
                   <button key={opt.val} onClick={() => handleSelectOption('mode', opt.val)} className={optionBtn}>
-                    <span className="group-hover:text-emerald-400 transition">{opt.label}</span>
-                    <span className="text-emerald-400">&rarr;</span>
+                    <span className="flex items-center gap-4"><span className="font-mono text-xs text-slate-500">0{index + 1}</span>{opt.label}</span>
+                    <ArrowRight size={17} className="text-emerald-400" aria-hidden />
                   </button>
                 ))}
               </div>
             )}
 
             {step === 4 && (
-              <div className="grid grid-cols-1 gap-3 max-w-xl mx-auto w-full pt-4">
+              <div className="mt-10 border-b border-slate-800">
                 {[
                   { label: `Einstieg / Flexibel (bis ca. ${Math.round(t1)} €)`, val: 'low' },
                   { label: `Fortgeschritten / Standard (ca. ${Math.round(t1)} € – ${Math.round(t2)} €)`, val: 'mid' },
                   { label: `Intensiv / Premium Betreuung (ab ${Math.round(t2)} €+)`, val: 'high' },
-                ].map((opt) => (
+                ].map((opt, index) => (
                   <button key={opt.val} onClick={() => handleSelectOption('budget', opt.val)} className={optionBtn}>
-                    <span className="group-hover:text-emerald-400 transition">{opt.label}</span>
-                    <span className="text-emerald-400">&rarr;</span>
+                    <span className="flex items-center gap-4 tabular-nums"><span className="font-mono text-xs text-slate-500">0{index + 1}</span>{opt.label}</span>
+                    <ArrowRight size={17} className="text-emerald-400" aria-hidden />
                   </button>
                 ))}
               </div>
             )}
 
             {step > 1 && (
-              <div className="text-center pt-2">
-                <button onClick={() => setStep((prev) => prev - 1)} className="text-xs text-slate-400 hover:text-white transition cursor-pointer">
-                  &larr; Einen Schritt zurück
+              <div className="pt-7">
+                <button type="button" onClick={() => setStep((prev) => prev - 1)} className="inline-flex min-h-11 cursor-pointer items-center gap-2 text-sm font-medium text-slate-400 transition-colors hover:text-white">
+                  <ArrowLeft size={16} aria-hidden /> Einen Schritt zurück
                 </button>
               </div>
             )}
+            </div>
           </div>
         ) : (
-          <div className="space-y-8">
-            <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-4 pb-6 border-b border-slate-800">
-              <div>
-                <span className="text-xs text-emerald-400 font-semibold uppercase tracking-wider">Deine Ergebnisse (Transparent & Direkt)</span>
-                <h2 className="text-2xl font-extrabold mt-1">Passende Trainer-Matches</h2>
+          <div className="w-full">
+            <div className="flex flex-col items-start justify-between gap-5 border-b border-slate-800 pb-8 md:flex-row md:items-end">
+              <div className="max-w-3xl">
+                <p className="text-sm font-semibold text-emerald-400">Dein Matching-Ergebnis</p>
+                <h1 className="mt-3 text-4xl font-semibold tracking-[-0.03em] sm:text-5xl">Passende Trainerprofile.</h1>
+                <p className="mt-4 text-sm leading-6 text-slate-400">Freie Termine werden zuerst angezeigt. Details zu Angeboten und Buchung findest du im jeweiligen Profil.</p>
               </div>
               <button
+                type="button"
                 onClick={resetQuiz}
-                className="text-xs bg-slate-900 border border-slate-800 hover:bg-slate-800 text-slate-300 px-4 py-2 rounded-xl transition cursor-pointer"
+                className="inline-flex min-h-11 cursor-pointer items-center gap-2 rounded-lg border border-slate-700 bg-slate-900 px-4 py-2.5 text-sm font-semibold text-slate-300 transition-colors hover:bg-slate-800 hover:text-white"
               >
-                &larr; Quiz neu starten
+                <RotateCcw size={16} aria-hidden /> Quiz neu starten
               </button>
             </div>
 
             {results.length === 0 ? (
-              <div className="bg-slate-900 border border-slate-800 rounded-2xl p-12 text-center space-y-4">
-                <p className="text-slate-400 text-sm">Kein Trainer exakt auf diese Kombination gematcht.</p>
-                <div className="flex justify-center gap-3">
-                  <button onClick={resetQuiz} className="bg-emerald-500 text-slate-950 font-semibold px-6 py-2.5 rounded-xl text-xs transition cursor-pointer">
+              <div className="border-b border-slate-800 py-12">
+                <h2 className="text-xl font-semibold text-white">Keine exakte Übereinstimmung gefunden.</h2>
+                <p className="mt-2 text-sm text-slate-400">Passe deine Angaben an oder sieh dir alle freigeschalteten Trainer an.</p>
+                <div className="mt-6 flex flex-col gap-3 sm:flex-row">
+                  <button onClick={resetQuiz} className="min-h-11 cursor-pointer rounded-lg bg-emerald-500 px-5 py-2.5 text-sm font-bold text-slate-950 transition-colors hover:bg-emerald-600">
                     Quiz neu starten
                   </button>
-                  <Link href="/trainer/list" className="bg-slate-800 border border-slate-700 text-white font-semibold px-6 py-2.5 rounded-xl text-xs transition">
+                  <Link href="/trainer/list" className="inline-flex min-h-11 items-center justify-center rounded-lg border border-slate-700 bg-slate-900 px-5 py-2.5 text-sm font-semibold text-white transition-colors hover:bg-slate-800">
                     Alle Trainer ansehen
                   </Link>
                 </div>
               </div>
             ) : (
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-                {results.map((trainer) => (
-                  <div key={trainer.id} className="bg-slate-900 border border-slate-800 rounded-2xl p-6 flex flex-col justify-between space-y-6 shadow-xl">
-                    <div className="space-y-3">
-                      <div className="flex justify-between items-start gap-3">
-                        <div className="flex items-center gap-3">
-                          <div className="w-12 h-12 rounded-xl overflow-hidden bg-slate-800 border border-slate-700 flex items-center justify-center text-lg font-bold text-emerald-400 shrink-0">
+              <div>
+                {results.map((trainer, index) => (
+                  <article key={trainer.id} className="grid gap-6 border-b border-slate-800 py-8 lg:grid-cols-[4rem_minmax(0,1fr)_minmax(14rem,0.55fr)_auto] lg:items-start">
+                    <div className="flex h-12 w-12 items-center justify-center overflow-hidden rounded-full border border-slate-700 bg-slate-900 text-sm font-bold text-emerald-400">
                             {trainer.avatar_url ? <img src={trainer.avatar_url} alt="" className="w-full h-full object-cover" /> : <span>{trainer.name?.charAt(0) || 'T'}</span>}
-                          </div>
-                          <h3 className="text-xl font-bold">{trainer.name || 'Trainer'}</h3>
-                        </div>
-                        <span className="text-xs bg-emerald-500/10 text-emerald-400 border border-emerald-500/20 px-2.5 py-1 rounded-full font-medium whitespace-nowrap">
-                          Verifiziert ✓
+                    </div>
+                    <div>
+                      <div className="flex flex-wrap items-center gap-3">
+                        <span className="font-mono text-xs text-slate-500">{String(index + 1).padStart(2, '0')}</span>
+                        <h2 className="text-2xl font-semibold tracking-tight">{trainer.name || 'Trainer'}</h2>
+                        <span className="inline-flex items-center gap-1.5 rounded-full border border-emerald-500/25 bg-emerald-500/10 px-2.5 py-1 text-xs font-medium text-emerald-300">
+                          <BadgeCheck size={14} aria-hidden /> Verifiziert
                         </span>
                       </div>
-                      <p className="text-slate-400 text-xs">
-                        {trainer.city || 'Online'} • {trainer.service_mode || 'Vor Ort & Online'}
+                      <p className="mt-2 flex flex-wrap items-center gap-2 text-sm text-slate-400">
+                        <MapPin size={14} aria-hidden /> {trainer.city || 'Standort flexibel'} <span aria-hidden>·</span> {trainer.service_mode || 'Trainingsform im Profil'}
                       </p>
-                      <p className="text-emerald-400 text-xs font-semibold">
+                      <p className="mt-4 text-sm font-medium leading-6 text-slate-300">
                         {trainer.specialtyList.length > 0 ? trainer.specialtyList.join(', ') : 'Individuelles Coaching'}
                       </p>
-                      <div className="flex flex-wrap gap-2">
+                    </div>
+                    <div className="space-y-2 text-sm tabular-nums">
                         {trainer.minPrice !== null && (
-                          <span className="text-xs text-slate-300 bg-slate-950 px-2.5 py-1.5 rounded-xl border border-slate-800">
-                            ab <strong className="text-emerald-400">{trainer.minPrice} €</strong>
-                          </span>
+                        <p className="font-semibold text-white">ab {trainer.minPrice.toFixed(2).replace('.', ',')} €</p>
                         )}
-                        <span
-                          className={`text-xs px-2.5 py-1.5 rounded-xl border ${
-                            trainer.freeSlots > 0
-                              ? 'bg-emerald-500/10 text-emerald-400 border-emerald-500/20'
-                              : 'bg-slate-950 text-slate-500 border-slate-800'
-                          }`}
-                        >
+                      <p className={`flex items-center gap-2 ${trainer.freeSlots > 0 ? 'text-emerald-400' : 'text-slate-500'}`}>
+                        <CalendarDays size={15} aria-hidden />
                           {trainer.freeSlots > 0 ? `${trainer.freeSlots} freie Termine` : 'Aktuell keine freien Termine'}
-                        </span>
-                      </div>
+                      </p>
                     </div>
 
                     <Link
                       href={`/trainer/${trainer.id}`}
-                      className="bg-emerald-500 hover:bg-emerald-600 text-slate-950 text-center font-bold py-2.5 rounded-xl text-xs transition"
+                      className="inline-flex min-h-11 items-center justify-center gap-2 rounded-lg border border-slate-700 bg-slate-900 px-4 py-2.5 text-sm font-semibold text-white transition-colors hover:border-emerald-500 hover:text-emerald-300"
                     >
-                      Profil & Angebote ansehen
+                      Profil ansehen <ArrowRight size={16} aria-hidden />
                     </Link>
-                  </div>
+                  </article>
                 ))}
               </div>
             )}
@@ -384,9 +415,7 @@ export default function QuizPage() {
         )}
       </section>
 
-      <footer className="border-t border-slate-900 py-6 text-center text-xs text-slate-600 max-w-7xl mx-auto w-full">
-        &copy; {new Date().getFullYear()} VeriFit. Alle Rechte vorbehalten.
-      </footer>
+      <Footer />
     </main>
   );
 }

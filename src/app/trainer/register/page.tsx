@@ -7,6 +7,7 @@ import { supabase } from '@/app/lib/supabase';
 import { registerSchema } from '@/app/lib/validation/authSchemas';
 import { FormFieldError } from '@/components/FormError';
 import { translateAuthError } from '@/lib/authErrors';
+import AuthShell from '@/components/AuthShell';
 
 type FieldErrors = {
   name?: string;
@@ -104,22 +105,7 @@ export default function TrainerRegisterPage() {
   const labelClass = 'block text-xs font-semibold text-slate-400 uppercase tracking-wider mb-2';
 
   return (
-    <main className="min-h-screen bg-slate-950 text-white flex flex-col justify-between">
-      <header className="flex justify-between items-center px-6 py-6 max-w-7xl mx-auto w-full">
-        <Link href="/" className="text-2xl font-black tracking-wider text-emerald-400">
-          VERIFIT<span className="text-white">.</span>
-        </Link>
-        <Link href="/" className="text-sm font-medium text-slate-300 hover:text-white transition">
-          &larr; Zurück zur Startseite
-        </Link>
-      </header>
-
-      <section className="flex flex-col items-center justify-center px-6 py-12 max-w-md mx-auto w-full flex-1">
-        <div className="w-full bg-slate-900 border border-slate-800 rounded-2xl p-8 shadow-2xl">
-          <div className="mb-6 text-center">
-            <h1 className="text-2xl font-extrabold mb-2">Trainer Registrierung</h1>
-            <p className="text-slate-400 text-sm">Erstelle dein verifiziertes Profil bei VeriFit.</p>
-          </div>
+    <AuthShell eyebrow="Trainer werden" title="Expertise, die sichtbar wird." description="Erstelle dein Profil. Nach der manuellen Prüfung kannst du passende Kunden begleiten." notes={['Manuelle Prüfung deiner Nachweise', 'Eigenes Profil und flexible Angebote', 'Klare Vermittlung ohne Leistungsversprechen']}>
 
           {errorMessage && (
             <div className="mb-4 p-3 bg-red-500/10 border border-red-500/20 rounded-xl text-red-400 text-xs">
@@ -139,28 +125,29 @@ export default function TrainerRegisterPage() {
 
           <form onSubmit={handleRegister} className="space-y-4" noValidate>
             <div>
-              <label className={labelClass}>Vollständiger Name</label>
-              <input type="text" autoComplete="name" placeholder="Max Mustermann" value={name} onChange={(e) => setName(e.target.value)} className={inputClass(fieldErrors.name)} />
-              <FormFieldError message={fieldErrors.name} />
+              <label htmlFor="trainer-register-name" className={labelClass}>Vollständiger Name</label>
+              <input id="trainer-register-name" type="text" aria-describedby={fieldErrors.name ? 'trainer-register-name-error' : undefined} autoComplete="name" placeholder="Max Mustermann" value={name} onChange={(e) => setName(e.target.value)} className={inputClass(fieldErrors.name)} />
+              <FormFieldError id="trainer-register-name-error" message={fieldErrors.name} />
             </div>
             <div>
-              <label className={labelClass}>E-Mail-Adresse</label>
-              <input type="email" autoComplete="email" placeholder="name@example.com" value={email} onChange={(e) => setEmail(e.target.value)} className={inputClass(fieldErrors.email)} />
-              <FormFieldError message={fieldErrors.email} />
+              <label htmlFor="trainer-register-email" className={labelClass}>E-Mail-Adresse</label>
+              <input id="trainer-register-email" type="email" aria-describedby={fieldErrors.email ? 'trainer-register-email-error' : undefined} autoComplete="email" placeholder="name@example.com" value={email} onChange={(e) => setEmail(e.target.value)} className={inputClass(fieldErrors.email)} />
+              <FormFieldError id="trainer-register-email-error" message={fieldErrors.email} />
             </div>
             <div>
-              <label className={labelClass}>Passwort (mind. 8 Zeichen)</label>
-              <input type="password" autoComplete="new-password" placeholder="••••••••" value={password} onChange={(e) => setPassword(e.target.value)} className={inputClass(fieldErrors.password)} />
-              <FormFieldError message={fieldErrors.password} />
+              <label htmlFor="trainer-register-password" className={labelClass}>Passwort (mind. 8 Zeichen)</label>
+              <input id="trainer-register-password" type="password" aria-describedby={fieldErrors.password ? 'trainer-register-password-error' : undefined} autoComplete="new-password" placeholder="••••••••" value={password} onChange={(e) => setPassword(e.target.value)} className={inputClass(fieldErrors.password)} />
+              <FormFieldError id="trainer-register-password-error" message={fieldErrors.password} />
             </div>
             <div>
-              <label className={labelClass}>Passwort bestätigen</label>
-              <input type="password" autoComplete="new-password" placeholder="••••••••" value={confirmPassword} onChange={(e) => setConfirmPassword(e.target.value)} className={inputClass(fieldErrors.confirmPassword)} />
-              <FormFieldError message={fieldErrors.confirmPassword} />
+              <label htmlFor="trainer-register-confirm-password" className={labelClass}>Passwort bestätigen</label>
+              <input id="trainer-register-confirm-password" type="password" aria-describedby={fieldErrors.confirmPassword ? 'trainer-register-confirm-password-error' : undefined} autoComplete="new-password" placeholder="••••••••" value={confirmPassword} onChange={(e) => setConfirmPassword(e.target.value)} className={inputClass(fieldErrors.confirmPassword)} />
+              <FormFieldError id="trainer-register-confirm-password-error" message={fieldErrors.confirmPassword} />
             </div>
             <div>
-              <label className={labelClass}>Kurzbiografie</label>
+              <label htmlFor="trainer-register-bio" className={labelClass}>Kurzbiografie</label>
               <textarea
+                id="trainer-register-bio"
                 placeholder="Erzähle kurz von deiner Erfahrung..."
                 value={bio}
                 onChange={(e) => setBio(e.target.value)}
@@ -173,6 +160,7 @@ export default function TrainerRegisterPage() {
                 <input
                   type="checkbox"
                   id="trainerTerms"
+                  aria-describedby={fieldErrors.terms ? 'trainer-register-terms-error' : undefined}
                   checked={terms}
                   onChange={(e) => setTerms(e.target.checked)}
                   className="mt-1 w-4 h-4 rounded border-slate-700 bg-slate-950 text-emerald-500 focus:ring-emerald-500 cursor-pointer"
@@ -184,7 +172,7 @@ export default function TrainerRegisterPage() {
                   gelesen und akzeptiere sie. Mir ist bekannt, dass mein Profil erst nach manueller Prüfung durch VeriFit freigeschaltet wird.
                 </label>
               </div>
-              <FormFieldError message={fieldErrors.terms} />
+              <FormFieldError id="trainer-register-terms-error" message={fieldErrors.terms} />
             </div>
 
             <button
@@ -202,12 +190,6 @@ export default function TrainerRegisterPage() {
               Anmelden
             </Link>
           </div>
-        </div>
-      </section>
-
-      <footer className="border-t border-slate-900 py-6 text-center text-xs text-slate-600 max-w-7xl mx-auto w-full">
-        &copy; {new Date().getFullYear()} VeriFit. Alle Rechte vorbehalten.
-      </footer>
-    </main>
+    </AuthShell>
   );
 }

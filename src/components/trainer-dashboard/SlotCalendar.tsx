@@ -70,7 +70,7 @@ export default function SlotCalendar({ slots, bookingBySlot, onToggle }: Props) 
           <span className="text-xs font-bold text-slate-300 uppercase tracking-wider">
             Stunden für: <span className="text-emerald-400">{selectedDate}</span>
           </span>
-          <span className="text-[11px] text-slate-500">Klicke auf eine Stunde zum Freigeben</span>
+          <span className="text-xs text-slate-400">Klicke auf eine Stunde zum Freigeben</span>
         </div>
 
         <FeedbackBox feedback={feedback} />
@@ -96,16 +96,16 @@ export default function SlotCalendar({ slots, bookingBySlot, onToggle }: Props) 
                 key={hour}
                 type="button"
                 onClick={() => void handleToggle(hour)}
-                className={`p-3 rounded-xl text-xs transition border flex flex-col items-center justify-between gap-1 cursor-pointer ${style}`}
+                className={`p-3 rounded-xl text-xs transition border flex flex-col items-center justify-between gap-1 cursor-pointer tabular-nums ${style}`}
               >
                 <div className="flex justify-between items-center w-full">
                   <span className="font-bold">{hour} Uhr</span>
                   <span>{slot ? '✓' : '+'}</span>
                 </div>
-                <span className="text-[9px] uppercase font-semibold">{label}</span>
+                <span className="text-xs font-semibold">{label}</span>
                 {booking && (
                   <div
-                    className="w-full text-center text-[9px] text-slate-300 truncate"
+                    className="w-full text-center text-xs text-slate-300 truncate"
                     title={`${booking.client_name} · ${booking.offer_title}`}
                   >
                     {booking.client_name} · {booking.offer_title}

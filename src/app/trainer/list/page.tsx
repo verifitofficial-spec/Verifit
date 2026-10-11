@@ -2,7 +2,12 @@
 
 import { useEffect, useState } from 'react';
 import Link from 'next/link';
+import { ArrowUpRight, BadgeCheck, MapPin, Search, SlidersHorizontal } from 'lucide-react';
 import { supabase } from '@/app/lib/supabase';
+import Footer from '@/components/Footer';
+import PublicHeader from '@/components/PublicHeader';
+import { SkeletonBlock } from '@/components/Skeleton';
+import { parseSpecialties } from '@/lib/constants';
 
 interface Trainer {
   id: string;
@@ -14,9 +19,28 @@ interface Trainer {
   availability_status: string | null;
 }
 
+function TrainerRowSkeleton() {
+  return (
+    <div className="grid gap-6 border-t border-slate-800 py-8 lg:grid-cols-[4rem_minmax(0,1fr)_minmax(15rem,0.7fr)_auto]">
+      <SkeletonBlock className="h-12 w-12 rounded-full" />
+      <div className="space-y-3">
+        <SkeletonBlock className="h-6 w-48" />
+        <SkeletonBlock className="h-4 w-64 max-w-full" />
+        <SkeletonBlock className="h-4 w-full max-w-lg" />
+      </div>
+      <div className="space-y-2">
+        <SkeletonBlock className="h-7 w-full" />
+        <SkeletonBlock className="h-7 w-2/3" />
+      </div>
+      <SkeletonBlock className="h-11 w-36" />
+    </div>
+  );
+}
+
 export default function PublicTrainersPage() {
   const [trainers, setTrainers] = useState<Trainer[]>([]);
   const [loading, setLoading] = useState(true);
+  const [loadError, setLoadError] = useState(false);
   const [cityFilter, setCityFilter] = useState('');
   const [specialtyFilter, setSpecialtyFilter] = useState('');
 
@@ -30,6 +54,7 @@ export default function PublicTrainersPage() {
 
       if (error) {
         console.error('Verifizierte Trainer konnten nicht geladen werden');
+        setLoadError(true);
       } else {
         setTrainers((data ?? []) as Trainer[]);
       }
@@ -49,99 +74,157 @@ export default function PublicTrainersPage() {
   });
 
   return (
-    <main className="min-h-screen bg-slate-950 text-white flex flex-col justify-between">
-      <header className="flex justify-between items-center px-6 py-6 max-w-7xl mx-auto w-full border-b border-slate-900">
-        <Link href="/" className="text-2xl font-black tracking-wider text-emerald-400">
-          VERIFIT<span className="text-white">.</span>{' '}
-          <span className="text-xs text-slate-400 font-normal">Client Hub</span>
-        </Link>
-        <Link
-          href="/client/login"
-          className="text-xs bg-slate-900 border border-slate-800 px-4 py-2 rounded-xl text-slate-300 hover:bg-slate-800 transition"
-        >
-          Kunden-Login
-        </Link>
-      </header>
+    <main className="min-h-screen bg-canvas text-ink">
+      <PublicHeader />
 
-      <section className="max-w-6xl mx-auto px-6 py-12 w-full flex-1 space-y-8">
-        <div>
-          <h1 className="text-3xl font-extrabold mb-2">Verifizierte Experten finden</h1>
-          <p className="text-slate-400 text-sm">
-            Entdecke geprüfte Personal Trainer, Coaches und Spezialisten für dein Training.
-          </p>
+      <section className="mx-auto w-full max-w-7xl px-5 py-14 sm:px-8 sm:py-20 lg:px-10">
+        <div className="grid gap-8 lg:grid-cols-[1fr_auto] lg:items-end">
+          <div className="max-w-3xl">
+            <p className="text-sm font-semibold text-emerald-400">Verifizierte Trainer</p>
+            <h1 className="mt-4 text-balance text-4xl font-semibold tracking-[-0.035em] sm:text-5xl lg:text-6xl">
+              Expertise, die du vergleichen kannst.
+            </h1>
+            <p className="mt-6 max-w-2xl text-base leading-7 text-slate-300">
+              Filtere freigeschaltete Trainer nach Standort und Fachgebiet. Im Profil findest du
+              Angebote und tatsächlich eingetragene freie Termine.
+            </p>
+          </div>
+          {!loading && !loadError && (
+            <div className="border-l border-slate-700 pl-5">
+              <span className="block font-mono text-3xl font-semibold tabular-nums text-white">{filteredTrainers.length}</span>
+              <span className="text-sm text-slate-400">{filteredTrainers.length === 1 ? 'passendes Profil' : 'passende Profile'}</span>
+            </div>
+          )}
         </div>
 
-        <div className="grid grid-cols-1 md:grid-cols-2 gap-4 bg-slate-900 p-4 rounded-2xl border border-slate-800">
-          <div>
-            <label className="block text-xs font-semibold text-slate-400 uppercase tracking-wider mb-1">
-              Standort / Stadt
-            </label>
-            <input
-              type="text"
-              placeholder="z.B. Berlin"
-              value={cityFilter}
-              onChange={(event) => setCityFilter(event.target.value)}
-              className="w-full bg-slate-950 border border-slate-800 rounded-xl px-4 py-2 text-sm text-white focus:outline-none focus:border-emerald-500"
-            />
+        <div className="mt-12 border-y border-slate-800 py-6">
+          <div className="mb-5 flex items-center gap-2 text-sm font-semibold text-white">
+            <SlidersHorizontal size={17} className="text-emerald-400" aria-hidden />
+            Auswahl eingrenzen
           </div>
-          <div>
-            <label className="block text-xs font-semibold text-slate-400 uppercase tracking-wider mb-1">
-              Spezialgebiet
-            </label>
-            <input
-              type="text"
-              placeholder="z.B. Rückentraining, Leistungsdiagnostik"
-              value={specialtyFilter}
-              onChange={(event) => setSpecialtyFilter(event.target.value)}
-              className="w-full bg-slate-950 border border-slate-800 rounded-xl px-4 py-2 text-sm text-white focus:outline-none focus:border-emerald-500"
-            />
+          <div className="grid gap-5 md:grid-cols-2">
+            <div>
+              <label htmlFor="city-filter" className="mb-2 block text-sm font-medium text-slate-300">
+                Standort oder Stadt
+              </label>
+              <div className="relative">
+                <MapPin className="pointer-events-none absolute left-3.5 top-1/2 -translate-y-1/2 text-slate-500" size={17} aria-hidden />
+                <input
+                  id="city-filter"
+                  type="search"
+                  placeholder="Zum Beispiel Berlin"
+                  value={cityFilter}
+                  onChange={(event) => setCityFilter(event.target.value)}
+                  className="min-h-12 w-full rounded-lg border border-slate-700 bg-slate-900 py-3 pl-11 pr-4 text-sm text-white placeholder:text-slate-500 transition-colors hover:border-slate-600 focus:border-emerald-500 focus:outline-none"
+                />
+              </div>
+            </div>
+            <div>
+              <label htmlFor="specialty-filter" className="mb-2 block text-sm font-medium text-slate-300">
+                Fachgebiet
+              </label>
+              <div className="relative">
+                <Search className="pointer-events-none absolute left-3.5 top-1/2 -translate-y-1/2 text-slate-500" size={17} aria-hidden />
+                <input
+                  id="specialty-filter"
+                  type="search"
+                  placeholder="Zum Beispiel Rückentraining"
+                  value={specialtyFilter}
+                  onChange={(event) => setSpecialtyFilter(event.target.value)}
+                  className="min-h-12 w-full rounded-lg border border-slate-700 bg-slate-900 py-3 pl-11 pr-4 text-sm text-white placeholder:text-slate-500 transition-colors hover:border-slate-600 focus:border-emerald-500 focus:outline-none"
+                />
+              </div>
+            </div>
           </div>
         </div>
 
-        {loading ? (
-          <p className="text-slate-400 text-sm">Lade verifizierte Trainer...</p>
-        ) : filteredTrainers.length === 0 ? (
-          <p className="text-slate-400 text-sm">Keine passenden Trainer gefunden.</p>
-        ) : (
-          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-            {filteredTrainers.map((trainer) => (
-              <article
-                key={trainer.id}
-                className="bg-slate-900 border border-slate-800 rounded-2xl p-6 flex flex-col justify-between space-y-4 shadow-xl"
-              >
-                <div className="space-y-2">
-                  <div className="flex justify-between items-start gap-3">
-                    <h2 className="text-lg font-bold">{trainer.name || 'Trainer'}</h2>
-                    <span className="text-[10px] bg-emerald-500/10 text-emerald-400 border border-emerald-500/30 px-2 py-0.5 rounded-full font-bold whitespace-nowrap">
-                      Verifiziert ✓
-                    </span>
-                  </div>
-                  <p className="text-xs text-slate-400">
-                    {trainer.city || 'Online / Flexibel'} • {trainer.service_mode || 'Hybrid'}
-                  </p>
-                  <p className="text-xs text-emerald-400 font-semibold">
-                    {trainer.specialties || 'Individuelles Coaching'}
-                  </p>
-                  <p className="text-xs text-slate-300 line-clamp-3 mt-2">
-                    {trainer.bio || 'Keine Biografie hinterlegt.'}
-                  </p>
-                </div>
+        <div className="mt-10" aria-live="polite" aria-busy={loading}>
+          {loading ? (
+            <div>
+              <p className="sr-only">Verifizierte Trainer werden geladen.</p>
+              <TrainerRowSkeleton />
+              <TrainerRowSkeleton />
+              <TrainerRowSkeleton />
+            </div>
+          ) : loadError ? (
+            <div role="alert" className="border-y border-red-500/25 bg-red-500/5 px-4 py-8">
+              <h2 className="font-semibold text-red-300">Die Trainerliste konnte nicht geladen werden.</h2>
+              <p className="mt-2 text-sm text-slate-400">Bitte lade die Seite erneut oder versuche es später noch einmal.</p>
+            </div>
+          ) : filteredTrainers.length === 0 ? (
+            <div className="border-y border-slate-800 py-10">
+              <h2 className="text-xl font-semibold text-white">Keine passenden Profile gefunden.</h2>
+              <p className="mt-2 max-w-xl text-sm leading-6 text-slate-400">
+                Entferne einen Filter oder starte das Matching, um deine Auswahl über Trainingsziel und Budget einzugrenzen.
+              </p>
+              <Link href="/quiz" className="mt-5 inline-flex items-center gap-2 text-sm font-bold text-emerald-400 hover:text-emerald-300">
+                Matching starten <ArrowUpRight size={16} aria-hidden />
+              </Link>
+            </div>
+          ) : (
+            <div>
+              {filteredTrainers.map((trainer, index) => {
+                const specialties = parseSpecialties(trainer.specialties);
+                const visibleSpecialties = specialties.slice(0, 3);
+                return (
+                  <article
+                    key={trainer.id}
+                    className="group grid gap-6 border-t border-slate-800 py-8 first:border-t-0 lg:grid-cols-[4rem_minmax(0,1fr)_minmax(15rem,0.7fr)_auto] lg:items-start"
+                  >
+                    <div className="flex h-12 w-12 items-center justify-center rounded-full border border-slate-700 bg-slate-900 text-sm font-bold text-emerald-400" aria-hidden>
+                      {trainer.name?.charAt(0).toUpperCase() || String(index + 1).padStart(2, '0')}
+                    </div>
 
-                <Link
-                  href={`/trainer/${trainer.id}`}
-                  className="w-full bg-emerald-500 hover:bg-emerald-600 text-slate-950 font-bold py-2.5 rounded-xl text-xs transition text-center"
-                >
-                  Profil, Angebote & Termine
-                </Link>
-              </article>
-            ))}
-          </div>
-        )}
+                    <div>
+                      <div className="flex flex-wrap items-center gap-3">
+                        <h2 className="text-2xl font-semibold tracking-tight text-white">{trainer.name || 'Trainer'}</h2>
+                        <span className="inline-flex items-center gap-1.5 rounded-full border border-emerald-500/30 bg-emerald-500/10 px-2.5 py-1 text-xs font-semibold text-emerald-300">
+                          <BadgeCheck size={14} aria-hidden /> Verifiziert
+                        </span>
+                      </div>
+                      <p className="mt-2 flex flex-wrap items-center gap-x-2 text-sm text-slate-400">
+                        <span>{trainer.city || 'Standort flexibel'}</span>
+                        <span aria-hidden>·</span>
+                        <span>{trainer.service_mode || 'Trainingsform im Profil'}</span>
+                      </p>
+                      <p className="mt-4 max-w-2xl text-sm leading-6 text-slate-300">
+                        {trainer.bio || 'Noch keine Biografie hinterlegt. Angebote und freie Termine findest du im Profil.'}
+                      </p>
+                    </div>
+
+                    <div>
+                      <p className="mb-3 text-xs font-semibold uppercase tracking-[0.16em] text-slate-500">Fachgebiete</p>
+                      {visibleSpecialties.length > 0 ? (
+                        <div className="flex flex-wrap gap-2">
+                          {visibleSpecialties.map((specialty) => (
+                            <span key={specialty} className="rounded-md border border-slate-700 bg-slate-900 px-2.5 py-1.5 text-xs font-medium text-slate-300">
+                              {specialty}
+                            </span>
+                          ))}
+                          {specialties.length > visibleSpecialties.length && (
+                            <span className="px-1 py-1.5 text-xs text-slate-500">+{specialties.length - visibleSpecialties.length} weitere</span>
+                          )}
+                        </div>
+                      ) : (
+                        <p className="text-sm text-slate-500">Noch keine Angaben</p>
+                      )}
+                    </div>
+
+                    <Link
+                      href={`/trainer/${trainer.id}`}
+                      className="inline-flex min-h-11 items-center justify-center gap-2 self-center rounded-lg border border-slate-700 bg-slate-900 px-4 py-2.5 text-sm font-semibold text-white transition-colors hover:border-emerald-500 hover:text-emerald-300 lg:self-start"
+                    >
+                      Profil ansehen <ArrowUpRight size={16} aria-hidden />
+                    </Link>
+                  </article>
+                );
+              })}
+            </div>
+          )}
+        </div>
       </section>
 
-      <footer className="border-t border-slate-900 py-6 text-center text-xs text-slate-600 max-w-7xl mx-auto w-full">
-        &copy; {new Date().getFullYear()} VeriFit. Alle Rechte vorbehalten.
-      </footer>
+      <Footer />
     </main>
   );
 }

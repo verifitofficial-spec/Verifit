@@ -77,10 +77,10 @@ export default function OffersSection({ offers, onSave, onDelete }: Props) {
               <div>
                 <div className="flex justify-between items-start mb-3">
                   <span
-                    className={`px-2.5 py-0.5 rounded-full text-[10px] font-semibold ${
+                    className={`rounded-full border px-2.5 py-1 text-xs font-medium ${
                       offer.type === 'discovery'
                         ? 'bg-emerald-500/10 text-emerald-400 border border-emerald-500/20'
-                        : 'bg-indigo-500/10 text-indigo-400 border border-indigo-500/20'
+                        : 'bg-slate-800 text-slate-300 border-slate-700'
                     }`}
                   >
                     {offer.type === 'discovery' ? 'Kostenlos (0€)' : 'Bezahlt'}
@@ -108,10 +108,10 @@ export default function OffersSection({ offers, onSave, onDelete }: Props) {
                 <p className="text-slate-400 text-xs mb-4">{offer.description}</p>
               </div>
               <div className="pt-3 border-t border-slate-900 flex items-center justify-between">
-                <div className="text-xs text-slate-300 flex items-center gap-1">
+                <div className="text-xs text-slate-300 flex items-center gap-1 tabular-nums">
                   <Clock size={12} className="text-slate-400" /> {offer.duration} Min.
                 </div>
-                <div className="text-sm font-bold text-emerald-400">
+                <div className="text-sm font-bold text-emerald-400 tabular-nums">
                   {offer.price === 0 ? '0,00 €' : `${offer.price} €`}
                 </div>
               </div>

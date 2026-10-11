@@ -7,6 +7,10 @@ import { supabase } from '@/app/lib/supabase';
 import Chat from '@/components/Chat';
 import TrendChart from '@/components/TrendChart';
 import DeleteAccountCard from '@/components/DeleteAccountCard';
+import BookingStatusBadge from '@/components/BookingStatusBadge';
+import Footer from '@/components/Footer';
+import { SkeletonBlock } from '@/components/Skeleton';
+import type { BookingStatus } from '@/lib/trainer-dashboard/types';
 import {
   RANGE_OPTIONS,
   TRACKING_METRICS,
@@ -36,7 +40,7 @@ type ClientBooking = {
   price: number | string | null;
   slot_date: string;
   slot_time: string | null;
-  status: 'pending' | 'accepted' | 'confirmed' | 'declined' | 'cancelled' | 'expired';
+  status: BookingStatus;
   payment_due_at: string | null;
 };
 
@@ -63,9 +67,9 @@ type Notice = { type: 'ok' | 'error'; text: string };
 
 const DAYS_OF_WEEK = ['Montag', 'Dienstag', 'Mittwoch', 'Donnerstag', 'Freitag', 'Samstag', 'Sonntag'];
 
-const cardCls = 'bg-slate-900 border border-slate-800 rounded-3xl p-8 shadow-2xl space-y-6';
+const cardCls = 'border-t border-slate-800 py-8 space-y-6';
 const inputCls =
-  'w-full bg-slate-950 border border-slate-800 rounded-xl px-4 py-2.5 text-sm text-white focus:outline-none focus:border-emerald-500';
+  'w-full bg-slate-950 border border-slate-700 rounded-xl px-4 py-2.5 text-sm text-white focus:outline-none focus:border-emerald-500';
 
 const emptyForm = (): Record<TrackingMetricKey, string> => ({
   weight: '',
@@ -87,23 +91,6 @@ function toNumber(value: string, integer: boolean): number | null {
 function formatPrice(price: number | string | null) {
   const value = Number(price);
   return value > 0 ? `${value.toFixed(2).replace('.', ',')} €` : 'Kostenlos';
-}
-
-function bookingStatus(status: ClientBooking['status']) {
-  switch (status) {
-    case 'accepted':
-      return { badge: 'bg-blue-500/10 text-blue-400 border-blue-500/20', text: 'Vom Trainer angenommen – Zahlung ausstehend' };
-    case 'confirmed':
-      return { badge: 'bg-emerald-500/10 text-emerald-400 border-emerald-500/20', text: 'Verbindlich bestätigt ✓' };
-    case 'declined':
-      return { badge: 'bg-red-500/10 text-red-400 border-red-500/20', text: 'Abgelehnt' };
-    case 'expired':
-      return { badge: 'bg-slate-800 text-slate-400 border-slate-700', text: 'Zahlungsfrist abgelaufen' };
-    case 'cancelled':
-      return { badge: 'bg-slate-800 text-slate-400 border-slate-700', text: 'Storniert' };
-    default:
-      return { badge: 'bg-amber-500/10 text-amber-400 border-amber-500/20', text: 'Anfrage ausstehend (wartet auf Bestätigung)' };
-  }
 }
 
 export default function ClientDashboard({ params }: { params: Promise<{ id: string }> }) {
@@ -433,11 +420,6 @@ export default function ClientDashboard({ params }: { params: Promise<{ id: stri
     await loadBookings(clientId);
   }
 
-  async function handleLogout() {
-    await supabase.auth.signOut();
-    router.push('/client/login');
-  }
-
   const rangeDays = RANGE_OPTIONS.find((option) => option.key === range)?.days ?? 30;
   const series = useMemo(
     () => TRACKING_METRICS.map((metric) => ({ metric, points: buildSeries(trackingHistory, metric.key, rangeDays) })),
@@ -447,7 +429,11 @@ export default function ClientDashboard({ params }: { params: Promise<{ id: stri
   if (loading || !client) {
     return (
       <div className="min-h-screen bg-slate-950 text-white flex items-center justify-center">
-        <p className="text-sm text-slate-400">Lade Dashboard...</p>
+        <div className="w-full max-w-3xl space-y-5 px-6" aria-label="Kunden-Dashboard wird geladen">
+          <SkeletonBlock className="h-4 w-32" />
+          <SkeletonBlock className="h-12 w-3/4" />
+          <SkeletonBlock className="h-40 w-full" />
+        </div>
       </div>
     );
   }
@@ -459,6 +445,8 @@ export default function ClientDashboard({ params }: { params: Promise<{ id: stri
   const noticeBox = (n: Notice | null) =>
     n && (
       <div
+        role={n.type === 'error' ? 'alert' : undefined}
+        aria-live={n.type === 'ok' ? 'polite' : undefined}
         className={`p-3 rounded-xl text-xs font-medium border ${
           n.type === 'ok' ? 'bg-emerald-500/10 border-emerald-500/25 text-emerald-400' : 'bg-red-500/10 border-red-500/20 text-red-400'
         }`}
@@ -469,19 +457,7 @@ export default function ClientDashboard({ params }: { params: Promise<{ id: stri
 
   return (
     <main className="min-h-screen bg-slate-950 text-white flex flex-col justify-between">
-      <header className="flex justify-between items-center px-6 py-6 max-w-7xl mx-auto w-full border-b border-slate-900">
-        <Link href="/" className="text-2xl font-black tracking-wider text-emerald-400">
-          VERIFIT<span className="text-white">.</span> <span className="text-xs text-slate-400 font-normal">Kunden-Portal</span>
-        </Link>
-        <button
-          onClick={handleLogout}
-          className="text-xs bg-slate-900 hover:bg-slate-800 text-slate-300 px-4 py-2 rounded-xl transition border border-slate-800 cursor-pointer"
-        >
-          Abmelden
-        </button>
-      </header>
-
-      <section className="max-w-4xl mx-auto px-6 py-12 w-full flex-1 space-y-8">
+      <section className="max-w-5xl mx-auto px-6 py-12 w-full flex-1 space-y-10">
         {noticeBox(notice)}
 
         {/* Zahlung ausstehend */}
@@ -497,7 +473,7 @@ export default function ClientDashboard({ params }: { params: Promise<{ id: stri
               <div key={booking.id} className="bg-slate-950 border border-slate-800 rounded-2xl p-4 flex flex-col md:flex-row md:items-center justify-between gap-3">
                 <div>
                   <p className="font-bold text-sm text-white">{booking.offer_title || 'Trainingseinheit'}</p>
-                  <p className="text-xs text-slate-400">
+                  <p className="text-xs text-slate-400 tabular-nums">
                     {booking.slot_date} um {booking.slot_time?.slice(0, 5) || '--:--'} Uhr · {formatPrice(booking.price)}
                   </p>
                   {booking.payment_due_at && (
@@ -518,10 +494,11 @@ export default function ClientDashboard({ params }: { params: Promise<{ id: stri
 
         {/* Willkommen & Buchungen */}
         <div id="buchungen" className={`${cardCls} scroll-mt-6`}>
-          <div className="flex justify-between items-center border-b border-slate-800 pb-6">
+          <div className="flex flex-col gap-5 sm:flex-row sm:items-end sm:justify-between">
             <div>
-              <h1 className="text-2xl font-extrabold">Willkommen, {client.name || 'Kunde'}</h1>
-              <p className="text-slate-400 text-sm">Angemeldet als: {client.email}</p>
+              <p className="text-xs font-bold uppercase tracking-[0.22em] text-emerald-400">Dein Health Hub</p>
+              <h1 className="mt-3 text-3xl font-black tracking-tight sm:text-5xl">Willkommen, {client.name || 'Kunde'}.</h1>
+              <p className="mt-3 text-sm text-slate-400">Termine, Pläne und Fortschritte für {client.email}</p>
             </div>
             <Link
               href="/quiz"
@@ -543,16 +520,15 @@ export default function ClientDashboard({ params }: { params: Promise<{ id: stri
             ) : (
               <div className="space-y-3">
                 {bookings.map((booking) => {
-                  const status = bookingStatus(booking.status);
                   const payNow = booking.status === 'accepted' && Number(booking.price) > 0;
                   return (
                     <div key={booking.id} className="bg-slate-950 p-5 rounded-2xl border border-slate-800 flex flex-col md:flex-row justify-between items-start md:items-center gap-4">
                       <div>
                         <div className="flex flex-wrap items-center gap-2 mb-1">
                           <span className="font-bold text-white text-sm">{booking.offer_title || 'Trainingseinheit'}</span>
-                          <span className={`text-[10px] px-2.5 py-0.5 rounded-full border ${status.badge}`}>{status.text}</span>
+                          <BookingStatusBadge status={booking.status} audience="client" />
                         </div>
-                        <p className="text-xs text-slate-400">
+                        <p className="text-xs text-slate-400 tabular-nums">
                           {booking.slot_date} um {booking.slot_time?.slice(0, 5) || '--:--'} Uhr · {formatPrice(booking.price)}
                         </p>
                         {payNow && booking.payment_due_at && (
@@ -855,9 +831,7 @@ export default function ClientDashboard({ params }: { params: Promise<{ id: stri
         <DeleteAccountCard role="client" />
       </section>
 
-      <footer className="border-t border-slate-900 py-6 text-center text-xs text-slate-600 max-w-7xl mx-auto w-full">
-        &copy; {new Date().getFullYear()} VeriFit. Alle Rechte vorbehalten.
-      </footer>
+      <Footer />
     </main>
   );
 }

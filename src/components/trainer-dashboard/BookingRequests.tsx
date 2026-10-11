@@ -4,20 +4,12 @@ import { useState } from 'react';
 import { Calendar as CalendarIcon, CheckCircle, Clock, DollarSign, User, XCircle } from 'lucide-react';
 import { formatDateDE } from '@/lib/trainer-dashboard/utils';
 import type { Booking, Feedback } from '@/lib/trainer-dashboard/types';
+import BookingStatusBadge from '@/components/BookingStatusBadge';
 import { FeedbackBox } from './ui';
 
 interface Props {
   bookings: Booking[];
   onRespond: (bookingId: string, accept: boolean) => Promise<string | null>;
-}
-
-function statusLabel(booking: Booking): { text: string; className: string } {
-  if (booking.status === 'pending') return { text: 'Neue Anfrage', className: 'bg-yellow-500/10 text-yellow-400' };
-  if (booking.status === 'accepted') return { text: 'Wartet auf Zahlung', className: 'bg-blue-500/10 text-blue-400' };
-  return {
-    text: booking.price > 0 ? 'Bezahlt ✓' : 'Bestätigt ✓',
-    className: 'bg-green-500/10 text-green-400',
-  };
 }
 
 export default function BookingRequests({ bookings, onRespond }: Props) {
@@ -43,7 +35,6 @@ export default function BookingRequests({ bookings, onRespond }: Props) {
         </div>
       ) : (
         bookings.map((booking) => {
-          const status = statusLabel(booking);
           return (
             <div
               key={booking.id}
@@ -52,20 +43,18 @@ export default function BookingRequests({ bookings, onRespond }: Props) {
               <div className="space-y-2">
                 <div className="flex items-center gap-3">
                   <span
-                    className={`px-2.5 py-0.5 rounded-full text-[10px] font-semibold ${
+                    className={`rounded-full border px-2.5 py-1 text-xs font-medium ${
                       booking.offer_type === 'discovery'
                         ? 'bg-emerald-500/10 text-emerald-400 border border-emerald-500/20'
-                        : 'bg-indigo-500/10 text-indigo-400 border border-indigo-500/20'
+                        : 'bg-slate-800 text-slate-300 border-slate-700'
                     }`}
                   >
                     {booking.offer_type === 'discovery' ? 'Kostenlos' : 'Kostenpflichtig'}
                   </span>
-                  <span className={`px-2.5 py-0.5 rounded-full text-[10px] font-medium ${status.className}`}>
-                    {status.text}
-                  </span>
+                  <BookingStatusBadge status={booking.status} audience="trainer" paid={booking.price > 0} />
                 </div>
                 <h3 className="text-sm font-bold text-white">{booking.offer_title}</h3>
-                <div className="flex flex-wrap items-center gap-4 text-xs text-slate-300">
+                <div className="flex flex-wrap items-center gap-4 text-xs text-slate-300 tabular-nums">
                   <span className="flex items-center gap-1 text-emerald-300 font-medium">
                     <User size={12} /> {booking.client_name}
                   </span>
