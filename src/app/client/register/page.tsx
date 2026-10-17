@@ -98,30 +98,30 @@ function ClientRegisterForm() {
 
     setInfoMessage(
       'Dein Konto wurde erstellt. Bitte bestätige deine E-Mail-Adresse über den Link in der Nachricht, die wir dir geschickt haben. Danach kannst du dich anmelden' +
-        (next ? ' und deine Buchung fortsetzen.' : '.')
+        (next ? ' und deine Kontaktanfrage fortsetzen.' : '.')
     );
     setLoading(false);
   }
 
   const inputClass = (error?: string) =>
-    `w-full bg-slate-950 border rounded-xl px-4 py-3 text-sm text-white focus:outline-none transition ${
-      error ? 'border-red-500/60 focus:border-red-500' : 'border-slate-800 focus:border-emerald-500'
+    `w-full bg-canvas border rounded-xl px-4 py-3 text-sm text-ink focus:outline-none transition ${
+      error ? 'border-danger-line focus:border-danger-line' : 'border-line focus:border-accent'
     }`;
-  const labelClass = 'block text-xs font-semibold text-slate-400 uppercase tracking-wider mb-2';
+  const labelClass = 'block text-xs font-semibold text-ink-muted uppercase tracking-wider mb-2';
 
   return (
-    <AuthShell eyebrow="Kundenkonto" title="Dein Training beginnt mit Klarheit." description={next ? 'Erstelle dein Konto und schließe danach deine ausgewählte Buchung ab.' : 'Erstelle dein Konto, finde passende Expertise und bündele Termine, Pläne und Fortschritte.'}>
+    <AuthShell eyebrow="Kundenkonto" title="Dein Training beginnt mit Klarheit." description={next ? 'Erstelle dein Konto und setze danach deine Kontaktanfrage fort.' : 'Erstelle dein Konto, finde passende Expertise und verwalte deine unverbindlichen Kontaktanfragen.'}>
 
           {errorMessage && (
-            <div className="mb-4 p-3 bg-red-500/10 border border-red-500/20 rounded-xl text-red-400 text-xs">
+            <div className="mb-4 p-3 bg-danger-soft border border-danger-line rounded-xl text-danger text-xs">
               {errorMessage}
             </div>
           )}
           {infoMessage && (
-            <div className="mb-4 p-3 bg-emerald-500/10 border border-emerald-500/20 rounded-xl text-emerald-400 text-xs leading-relaxed">
+            <div className="mb-4 p-3 bg-accent-soft border border-accent/35 rounded-xl text-accent text-xs leading-relaxed">
               {infoMessage}
               <div className="mt-2">
-                <Link href={withNext('/client/login', next)} className="underline text-emerald-300">
+                <Link href={withNext('/client/login', next)} className="underline text-accent">
                   Zum Login
                 </Link>
               </div>
@@ -159,9 +159,9 @@ function ClientRegisterForm() {
                     aria-describedby={fieldErrors.healthConsent ? 'client-register-health-consent-error' : undefined}
                     checked={healthConsent}
                     onChange={(e) => setHealthConsent(e.target.checked)}
-                    className="mt-1 w-4 h-4 rounded border-slate-700 bg-slate-950 text-emerald-500 focus:ring-emerald-500 cursor-pointer"
+                    className="mt-1 w-4 h-4 rounded border-line-strong bg-canvas text-accent focus:ring-accent cursor-pointer"
                   />
-                  <label htmlFor="healthDataConsent" className="text-xs text-slate-400 leading-tight">
+                  <label htmlFor="healthDataConsent" className="text-xs text-ink-muted leading-tight">
                     Ich willige ausdrücklich ein, dass meine sensiblen Gesundheitsdaten (wie Körpergewicht, Stimmung, Schlaf) zur Auswertung und Anpassung meiner Trainingsziele durch VeriFit und verbundene Trainer verarbeitet werden (gemäß Art. 9 DSGVO). Diese Einwilligung kann ich jederzeit widerrufen.
                   </label>
                 </div>
@@ -176,12 +176,12 @@ function ClientRegisterForm() {
                     aria-describedby={fieldErrors.terms ? 'client-register-terms-error' : undefined}
                     checked={terms}
                     onChange={(e) => setTerms(e.target.checked)}
-                    className="mt-1 w-4 h-4 rounded border-slate-700 bg-slate-950 text-emerald-500 focus:ring-emerald-500 cursor-pointer"
+                    className="mt-1 w-4 h-4 rounded border-line-strong bg-canvas text-accent focus:ring-accent cursor-pointer"
                   />
-                  <label htmlFor="termsConsent" className="text-xs text-slate-400 leading-tight">
+                  <label htmlFor="termsConsent" className="text-xs text-ink-muted leading-tight">
                     Ich habe die{' '}
-                    <Link href="/agb" target="_blank" className="text-emerald-400 hover:underline">AGB</Link> und die{' '}
-                    <Link href="/datenschutz" target="_blank" className="text-emerald-400 hover:underline">Datenschutzerklärung</Link>{' '}
+                    <Link href="/agb" target="_blank" className="text-accent hover:underline">AGB</Link> und die{' '}
+                    <Link href="/datenschutz" target="_blank" className="text-accent hover:underline">Datenschutzerklärung</Link>{' '}
                     gelesen und akzeptiere sie.
                   </label>
                 </div>
@@ -192,15 +192,15 @@ function ClientRegisterForm() {
             <button
               type="submit"
               disabled={loading}
-              className="w-full bg-emerald-500 hover:bg-emerald-600 text-slate-950 font-bold py-3 rounded-xl text-sm transition cursor-pointer disabled:opacity-60 mt-2"
+              className="w-full bg-accent hover:bg-accent-strong text-primary-foreground font-bold py-3 rounded-xl text-sm transition cursor-pointer disabled:opacity-60 mt-2"
             >
               {loading ? 'Erstelle Konto...' : 'Registrieren'}
             </button>
           </form>
 
-          <div className="mt-6 text-center text-xs text-slate-500">
+          <div className="mt-6 text-center text-xs text-ink-muted">
             Bereits ein Konto?{' '}
-            <Link href={withNext('/client/login', next)} className="text-emerald-400 hover:underline">
+            <Link href={withNext('/client/login', next)} className="text-accent hover:underline">
               Jetzt anmelden
             </Link>
           </div>
@@ -210,7 +210,7 @@ function ClientRegisterForm() {
 
 export default function ClientRegisterPage() {
   return (
-    <Suspense fallback={<div className="min-h-screen bg-slate-950" />}>
+    <Suspense fallback={<div className="min-h-screen bg-canvas" />}>
       <ClientRegisterForm />
     </Suspense>
   );

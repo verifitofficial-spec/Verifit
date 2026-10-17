@@ -17,13 +17,13 @@ export type TrackingMetric = {
 };
 
 export const TRACKING_METRICS: TrackingMetric[] = [
-  { key: 'weight', title: 'Gewicht', inputLabel: 'Gewicht (kg)', unit: 'kg', color: '#34d399', decimals: 1, step: '0.1', placeholder: 'z.B. 78.5', integer: false },
-  { key: 'calories', title: 'Kalorien', inputLabel: 'Kalorien (kcal)', unit: 'kcal', color: '#fbbf24', decimals: 0, step: '1', placeholder: 'z.B. 2200', integer: true },
-  { key: 'water', title: 'Wasser', inputLabel: 'Wasseraufnahme (Liter)', unit: 'L', color: '#38bdf8', decimals: 1, step: '0.1', placeholder: 'z.B. 3.0', integer: false },
-  { key: 'sleep', title: 'Schlaf', inputLabel: 'Schlaf (Stunden)', unit: 'h', color: '#a78bfa', decimals: 1, step: '0.5', placeholder: 'z.B. 7.5', integer: false },
-  { key: 'mood', title: 'Laune', inputLabel: 'Laune / Wohlbefinden (1 - 10)', unit: '/10', color: '#f472b6', decimals: 0, step: '1', placeholder: 'z.B. 8', integer: true, min: 1, max: 10 },
-  { key: 'health', title: 'Gesundheit', inputLabel: 'Gesundheitszustand (1 - 10)', unit: '/10', color: '#f87171', decimals: 0, step: '1', placeholder: 'z.B. 9', integer: true, min: 1, max: 10 },
-  { key: 'motivation', title: 'Motivation', inputLabel: 'Motivation (1 - 10)', unit: '/10', color: '#fb923c', decimals: 0, step: '1', placeholder: 'z.B. 7', integer: true, min: 1, max: 10 },
+  { key: 'weight', title: 'Gewicht', inputLabel: 'Gewicht (kg)', unit: 'kg', color: 'var(--chart-weight)', decimals: 1, step: '0.1', placeholder: 'z. B. 78,5', integer: false },
+  { key: 'calories', title: 'Kalorien', inputLabel: 'Kalorien (kcal)', unit: 'kcal', color: 'var(--chart-calories)', decimals: 0, step: '1', placeholder: 'z. B. 2200', integer: true },
+  { key: 'water', title: 'Wasser', inputLabel: 'Wasseraufnahme (Liter)', unit: 'L', color: 'var(--chart-water)', decimals: 1, step: '0.1', placeholder: 'z. B. 3,0', integer: false },
+  { key: 'sleep', title: 'Schlaf', inputLabel: 'Schlaf (Stunden)', unit: 'h', color: 'var(--chart-sleep)', decimals: 1, step: '0.5', placeholder: 'z. B. 7,5', integer: false },
+  { key: 'mood', title: 'Laune', inputLabel: 'Laune / Wohlbefinden (1–10)', unit: '/10', color: 'var(--chart-mood)', decimals: 0, step: '1', placeholder: 'z. B. 8', integer: true, min: 1, max: 10 },
+  { key: 'health', title: 'Gesundheit', inputLabel: 'Gesundheitszustand (1–10)', unit: '/10', color: 'var(--chart-health)', decimals: 0, step: '1', placeholder: 'z. B. 9', integer: true, min: 1, max: 10 },
+  { key: 'motivation', title: 'Motivation', inputLabel: 'Motivation (1–10)', unit: '/10', color: 'var(--chart-motivation)', decimals: 0, step: '1', placeholder: 'z. B. 7', integer: true, min: 1, max: 10 },
 ];
 
 export type TrackingEntry = { id: string; created_at: string } & Record<TrackingMetricKey, number | null>;

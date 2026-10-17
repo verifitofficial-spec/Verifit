@@ -9,7 +9,7 @@ interface Props {
   onSubmit: (food: NewFoodInput) => Promise<string | null>;
 }
 
-const fieldLabel = 'block text-xs font-semibold text-slate-400 uppercase tracking-wider mb-1.5';
+const fieldLabel = 'block text-xs font-semibold text-ink-muted uppercase tracking-wider mb-1.5';
 
 export default function FoodModal({ onClose, onSubmit }: Props) {
   const [name, setName] = useState('');
@@ -45,7 +45,7 @@ export default function FoodModal({ onClose, onSubmit }: Props) {
     >
       <form onSubmit={handleSubmit} className="space-y-4">
         {error && (
-          <div className="p-3 bg-red-500/10 border border-red-500/25 rounded-xl text-xs text-red-400">{error}</div>
+          <div className="p-3 bg-danger-soft border border-danger-line rounded-xl text-xs text-danger">{error}</div>
         )}
         <div>
           <label className={fieldLabel}>Name</label>

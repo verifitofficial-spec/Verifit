@@ -4,6 +4,14 @@ import { useCallback, useEffect, useMemo, useState } from 'react';
 import { supabase } from '@/app/lib/supabase';
 import { todayDateStr } from '@/lib/trainer-dashboard/utils';
 import type { Booking, OfferDraft, OfferTemplate, TrainerSlot } from '@/lib/trainer-dashboard/types';
+import {
+  isMissingPhase3MetadataError,
+  normalizePricingModel,
+  normalizeServiceMode,
+  offerMetadataForPersistence,
+  validateOfferMetadata,
+} from '@/lib/matching';
+import { isAuthorizationError } from '@/lib/supabaseErrors';
 
 interface OfferRow {
   id: string;
@@ -12,6 +20,9 @@ interface OfferRow {
   duration_minutes: number;
   price: number | string;
   description: string | null;
+  service_mode?: string | null;
+  pricing_model?: string | null;
+  included_sessions?: number | null;
 }
 
 /** Alle Aktionen liefern `null` bei Erfolg oder eine deutsche Fehlermeldung. */
@@ -32,7 +43,7 @@ export function useTrainerSchedule(trainerId: string) {
   const loadOffers = useCallback(async () => {
     const { data, error } = await supabase
       .from('trainer_offers')
-      .select('*')
+      .select('id, title, type, duration_minutes, price, description, service_mode, pricing_model, included_sessions')
       .eq('trainer_id', trainerId)
       .eq('is_active', true)
       .order('created_at', { ascending: true });
@@ -48,6 +59,9 @@ export function useTrainerSchedule(trainerId: string) {
         duration: o.duration_minutes,
         price: Number(o.price),
         description: o.description ?? '',
+        serviceMode: normalizeServiceMode(o.service_mode),
+        pricingModel: normalizePricingModel(o.pricing_model),
+        includedSessions: o.included_sessions ?? null,
       }))
     );
   }, [trainerId]);
@@ -137,21 +151,39 @@ export function useTrainerSchedule(trainerId: string) {
     async (draft: OfferDraft, editingId: string | null): Promise<string | null> => {
       if (!draft.title.trim()) return 'Bitte gib einen Titel ein.';
       const price = draft.type === 'discovery' ? 0 : Number(draft.price) || 0;
-      if (draft.type === 'paid' && price <= 0) return 'Bezahlte Angebote brauchen einen Preis größer 0.';
+      const validationError = validateOfferMetadata({ ...draft, price });
+      if (validationError) return validationError;
+      const metadata = offerMetadataForPersistence(draft);
 
-      const payload = {
-        trainer_id: trainerId,
+      const offerFields = {
         title: draft.title.trim(),
         type: draft.type,
         duration_minutes: Number(draft.duration) || 60,
         price,
         description: draft.description.trim() || null,
+        ...metadata,
       };
 
-      const { error } = editingId
-        ? await supabase.from('trainer_offers').update(payload).eq('id', editingId)
-        : await supabase.from('trainer_offers').insert(payload);
-      if (error) return 'Fehler beim Speichern: ' + error.message;
+      const { data, error } = editingId
+        ? await supabase
+            .from('trainer_offers')
+            .update(offerFields)
+            .eq('id', editingId)
+            .eq('trainer_id', trainerId)
+            .select('id')
+            .maybeSingle()
+        : await supabase
+            .from('trainer_offers')
+            .insert({ trainer_id: trainerId, ...offerFields })
+            .select('id')
+            .maybeSingle();
+      if (error || !data) {
+        return isMissingPhase3MetadataError(error)
+          ? 'Angebote können erst nach Ausführung der Phase-3-Migration klassifiziert werden.'
+          : isAuthorizationError(error) || !data
+            ? 'Das Angebot konnte wegen fehlender Berechtigung nicht gespeichert werden. Bitte melde dich erneut an.'
+          : 'Das Angebot konnte nicht gespeichert werden.';
+      }
 
       await loadOffers();
       return null;
@@ -162,12 +194,22 @@ export function useTrainerSchedule(trainerId: string) {
   /** Soft-Delete: Buchungen behalten ihre Kopie der Paketdaten. */
   const deleteOffer = useCallback(
     async (id: string): Promise<string | null> => {
-      const { error } = await supabase.from('trainer_offers').update({ is_active: false }).eq('id', id);
-      if (error) return 'Fehler beim Löschen: ' + error.message;
+      const { data, error } = await supabase
+        .from('trainer_offers')
+        .update({ is_active: false })
+        .eq('id', id)
+        .eq('trainer_id', trainerId)
+        .select('id')
+        .maybeSingle();
+      if (error || !data) {
+        return isAuthorizationError(error) || !data
+          ? 'Das Angebot konnte wegen fehlender Berechtigung nicht deaktiviert werden. Bitte melde dich erneut an.'
+          : 'Das Angebot konnte nicht deaktiviert werden.';
+      }
       await loadOffers();
       return null;
     },
-    [loadOffers]
+    [trainerId, loadOffers]
   );
 
   const activeBookings = useMemo(

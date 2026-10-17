@@ -35,7 +35,7 @@ export default function NutritionPlanner({ trainerId, clients }: { trainerId: st
           <button
             type="button"
             onClick={() => setFoodModalOpen(true)}
-            className="bg-slate-800 hover:bg-slate-700 text-white px-3.5 py-2 rounded-xl text-xs font-semibold flex items-center gap-2 border border-slate-700 transition cursor-pointer shadow-sm"
+            className="bg-surface-soft hover:bg-surface-hover text-ink px-3.5 py-2 rounded-xl text-xs font-semibold flex items-center gap-2 border border-line-strong transition cursor-pointer shadow-sm"
           >
             <Plus size={14} /> Neues Lebensmittel in DB
           </button>
@@ -65,7 +65,7 @@ export default function NutritionPlanner({ trainerId, clients }: { trainerId: st
           onRemove={planner.unassignDate}
         />
 
-        <div className="border-t border-slate-800 pt-6 space-y-4">
+        <div className="border-t border-line pt-6 space-y-4">
           <TemplateBar
             defaults={DEFAULT_NAMES}
             customs={planner.templates.map((t) => t.templateName)}

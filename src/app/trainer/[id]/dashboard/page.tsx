@@ -2,32 +2,25 @@
 
 import { use } from 'react';
 import { useTrainerAccount } from '@/hooks/trainer-dashboard/useTrainerAccount';
-import { useTrainerSchedule } from '@/hooks/trainer-dashboard/useTrainerSchedule';
-import { useClients } from '@/hooks/trainer-dashboard/useClients';
+import { useTrainerOffers } from '@/hooks/trainer-dashboard/useTrainerOffers';
 import type { TrainerProfile } from '@/lib/trainer-dashboard/types';
 import ProfileSection from '@/components/trainer-dashboard/ProfileSection';
 import SpecialtiesSection from '@/components/trainer-dashboard/SpecialtiesSection';
 import VerificationSection from '@/components/trainer-dashboard/VerificationSection';
-import StripeSection from '@/components/trainer-dashboard/StripeSection';
 import OffersSection from '@/components/trainer-dashboard/OffersSection';
-import ScheduleSection from '@/components/trainer-dashboard/ScheduleSection';
-import WorkoutPlanner from '@/components/trainer-dashboard/WorkoutPlanner';
-import NutritionPlanner from '@/components/trainer-dashboard/NutritionPlanner';
-import ChatSection from '@/components/trainer-dashboard/ChatSection';
 import DeleteAccountCard from '@/components/DeleteAccountCard';
-import StripeReturnSync from '@/components/StripeReturnSync';
+import InquiryList from '@/components/InquiryList';
 import Footer from '@/components/Footer';
 import { SkeletonBlock } from '@/components/Skeleton';
 
 export default function TrainerDashboardPage({ params }: { params: Promise<{ id: string }> }) {
   const { id } = use(params);
-  const { trainer, loading, updateTrainer } = useTrainerAccount(id);
-  const schedule = useTrainerSchedule(id);
-  const clients = useClients();
+  const { trainer, loading, error, retry, updateTrainer } = useTrainerAccount(id);
+  const offers = useTrainerOffers(id);
 
-  if (loading || !trainer) {
+  if (loading) {
     return (
-      <div className="min-h-screen bg-slate-950 text-white flex items-center justify-center">
+      <div className="min-h-screen bg-canvas text-ink flex items-center justify-center">
         <div className="w-full max-w-3xl space-y-5 px-6" aria-label="Trainer-Dashboard wird geladen">
           <SkeletonBlock className="h-4 w-32" />
           <SkeletonBlock className="h-12 w-3/4" />
@@ -37,46 +30,54 @@ export default function TrainerDashboardPage({ params }: { params: Promise<{ id:
     );
   }
 
+  if (error || !trainer) {
+    return (
+      <main className="flex min-h-screen items-center justify-center bg-canvas px-5 text-ink">
+        <div role="alert" className="w-full max-w-xl border-y border-danger-line py-8">
+          <p className="text-sm font-semibold text-danger">Trainer-Dashboard nicht verfügbar</p>
+          <h1 className="mt-3 text-3xl font-bold">Dein Profil konnte nicht geladen werden.</h1>
+          <p className="mt-3 text-sm text-ink-muted">{error ?? 'Bitte versuche es erneut.'}</p>
+          <button type="button" onClick={retry} className="mt-6 min-h-11 rounded-lg bg-accent px-5 py-2.5 text-sm font-bold text-primary-foreground">
+            Erneut versuchen
+          </button>
+        </div>
+      </main>
+    );
+  }
+
   const profile: TrainerProfile = trainer;
 
   return (
-    <main className="min-h-screen bg-slate-950 text-slate-100 flex flex-col justify-between selection:bg-emerald-500 selection:text-slate-950">
-      <section className="max-w-5xl mx-auto px-4 sm:px-6 py-10 w-full flex-1 space-y-10">
-        <div className="flex flex-col gap-5 pb-4 sm:flex-row sm:items-end sm:justify-between">
+    <main className="min-h-screen bg-canvas text-ink flex flex-col justify-between selection:bg-accent selection:text-primary-foreground">
+      <section className="max-w-5xl mx-auto px-4 sm:px-6 py-8 w-full flex-1 space-y-6 sm:py-10">
+        <div className="flex flex-col gap-4 pb-2 sm:flex-row sm:items-end sm:justify-between">
           <div>
-            <p className="text-xs font-bold uppercase tracking-[0.22em] text-emerald-400">Expert Hub</p>
-            <h1 className="mt-3 text-3xl font-black tracking-tight text-white sm:text-5xl">Dein Coaching im Überblick.</h1>
-            <p className="mt-3 text-sm text-slate-400">Profil, Angebote, Termine und Kundenpläne verwalten.</p>
+            <h1 className="text-3xl font-bold tracking-tight text-ink sm:text-4xl">Trainer-Dashboard</h1>
+            <p className="mt-2 text-sm text-ink-muted">Profil, Verifizierung, Angebote und Kontaktanfragen.</p>
           </div>
           <span
             className={`inline-flex w-fit rounded-full border px-3 py-1 text-xs font-medium ${
               profile.status === 'approved'
-                ? 'border-emerald-500/25 bg-emerald-500/10 text-emerald-400'
-                : 'border-amber-500/25 bg-amber-500/10 text-amber-400'
+                ? 'border-accent/40 bg-accent-soft text-accent'
+                : 'border-warning-line bg-warning-soft text-warning'
             }`}
           >
             {profile.status === 'approved' ? 'Verifiziert' : 'Prüfung ausstehend'}
           </span>
         </div>
 
-        <StripeReturnSync />
-
         <ProfileSection trainer={profile} onChange={updateTrainer} />
         <SpecialtiesSection trainer={profile} onChange={updateTrainer} />
         <VerificationSection trainer={profile} onChange={updateTrainer} />
-        <StripeSection trainer={profile} />
-        <OffersSection offers={schedule.offers} onSave={schedule.saveOffer} onDelete={schedule.deleteOffer} />
-        <ScheduleSection
-          slots={schedule.slots}
-          activeBookings={schedule.activeBookings}
-          pendingCount={schedule.pendingCount}
-          bookingBySlot={schedule.bookingBySlot}
-          onRespond={schedule.respondToBooking}
-          onToggleSlot={schedule.toggleSlot}
+        <InquiryList audience="trainer" />
+        <OffersSection
+          offers={offers.offers}
+          loading={offers.loading}
+          loadError={offers.error}
+          onRetry={() => void offers.reload()}
+          onSave={offers.saveOffer}
+          onDelete={offers.deleteOffer}
         />
-        <ChatSection trainerId={profile.id} />
-        <WorkoutPlanner trainerId={profile.id} clients={clients} />
-        <NutritionPlanner trainerId={profile.id} clients={clients} />
         <DeleteAccountCard role="trainer" />
       </section>
 

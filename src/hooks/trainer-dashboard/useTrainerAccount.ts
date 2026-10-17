@@ -15,11 +15,15 @@ export function useTrainerAccount(routeId: string) {
   const router = useRouter();
   const [trainer, setTrainer] = useState<TrainerProfile | null>(null);
   const [loading, setLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
+  const [reloadKey, setReloadKey] = useState(0);
 
   useEffect(() => {
     let active = true;
 
     async function load() {
+      setLoading(true);
+      setError(null);
       const {
         data: { user },
       } = await supabase.auth.getUser();
@@ -33,15 +37,35 @@ export function useTrainerAccount(routeId: string) {
         return;
       }
 
-      const { data: profile } = await supabase.from('profiles').select('role').eq('id', user.id).maybeSingle();
+      const { data: profile, error: profileError } = await supabase
+        .from('profiles')
+        .select('role')
+        .eq('id', user.id)
+        .maybeSingle();
+      if (profileError) {
+        if (active) {
+          setError('Deine Berechtigung konnte nicht geprüft werden.');
+          setLoading(false);
+        }
+        return;
+      }
       if (profile?.role !== 'trainer') {
         router.push('/trainer/login');
         return;
       }
 
-      const { data } = await supabase.from('trainers').select('*').eq('id', user.id).maybeSingle();
+      const { data, error: trainerError } = await supabase
+        .from('trainers')
+        .select('*')
+        .eq('id', user.id)
+        .maybeSingle();
       if (!active) return;
-      setTrainer((data as TrainerProfile | null) ?? null);
+      if (trainerError || !data) {
+        setError('Dein Trainerprofil konnte nicht geladen werden.');
+        setTrainer(null);
+      } else {
+        setTrainer(data as TrainerProfile);
+      }
       setLoading(false);
     }
 
@@ -49,7 +73,7 @@ export function useTrainerAccount(routeId: string) {
     return () => {
       active = false;
     };
-  }, [routeId, router]);
+  }, [reloadKey, routeId, router]);
 
   const updateTrainer = useCallback((patch: Partial<TrainerProfile>) => {
     setTrainer((prev) => (prev ? { ...prev, ...patch } : prev));
@@ -60,5 +84,7 @@ export function useTrainerAccount(routeId: string) {
     router.push('/login');
   }, [router]);
 
-  return { trainer, loading, updateTrainer, logout };
+  const retry = useCallback(() => setReloadKey((value) => value + 1), []);
+
+  return { trainer, loading, error, retry, updateTrainer, logout };
 }

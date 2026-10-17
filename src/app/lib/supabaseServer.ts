@@ -17,6 +17,14 @@ export function getAdminClient() {
   );
 }
 
+export function getPublicClient() {
+  return createClient(
+    process.env.NEXT_PUBLIC_SUPABASE_URL!,
+    process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!,
+    { auth: { persistSession: false } }
+  );
+}
+
 export function getAccessTokenFromRequest(req: Request): string | null {
   return req.headers.get('authorization')?.replace(/^Bearer\s+/i, '') || null;
 }

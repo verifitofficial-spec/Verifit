@@ -20,15 +20,15 @@ const PAD_R = 10;
 const PAD_T = 12;
 const PAD_B = 24;
 
-export default function TrendChart({ title, unit = '', color = '#34d399', points, decimals = 1, fixedMin, fixedMax }: Props) {
+export default function TrendChart({ title, unit = '', color = 'var(--chart-weight)', points, decimals = 1, fixedMin, fixedMax }: Props) {
   const gradientId = `grad-${useId().replace(/:/g, '')}`;
   const valid = points.filter((p): p is { label: string; value: number } => p.value !== null && Number.isFinite(p.value));
 
   if (valid.length === 0) {
     return (
-      <div className="bg-slate-950 border border-slate-800 rounded-2xl p-4">
-        <p className="text-xs font-bold text-slate-300">{title}</p>
-        <p className="text-[11px] text-slate-500 mt-6 mb-6 text-center">Noch keine Werte im gewählten Zeitraum.</p>
+      <div className="bg-canvas border border-line rounded-2xl p-4">
+        <p className="text-xs font-bold text-ink-soft">{title}</p>
+        <p className="text-[11px] text-ink-muted mt-6 mb-6 text-center">Noch keine Werte im gewählten Zeitraum.</p>
       </div>
     );
   }
@@ -60,20 +60,20 @@ export default function TrendChart({ title, unit = '', color = '#34d399', points
   const fmt = (v: number) => v.toFixed(decimals);
 
   return (
-    <div className="bg-slate-950 border border-slate-800 rounded-2xl p-4 space-y-2">
+    <div className="bg-canvas border border-line rounded-2xl p-4 space-y-2">
       <div className="flex items-start justify-between gap-2">
         <div>
-          <p className="text-xs font-bold text-slate-300">{title}</p>
+          <p className="text-xs font-bold text-ink-soft">{title}</p>
           <p className="text-lg font-black" style={{ color }}>
-            {fmt(latest)} <span className="text-[11px] font-semibold text-slate-500">{unit}</span>
+            {fmt(latest)} <span className="text-[11px] font-semibold text-ink-muted">{unit}</span>
           </p>
         </div>
-        <div className="text-right text-[10px] text-slate-500 leading-4">
+        <div className="text-right text-[10px] text-ink-muted leading-4">
           <p>
             Ø {fmt(average)} {unit}
           </p>
           {delta !== null && (
-            <p className={delta === 0 ? 'text-slate-500' : 'text-slate-300'}>
+            <p className={delta === 0 ? 'text-ink-muted' : 'text-ink-soft'}>
               {delta > 0 ? '+' : ''}
               {fmt(delta)} {unit} im Zeitraum
             </p>
@@ -91,8 +91,8 @@ export default function TrendChart({ title, unit = '', color = '#34d399', points
 
         {ticks.map((tick) => (
           <g key={tick}>
-            <line x1={PAD_L} x2={W - PAD_R} y1={y(tick)} y2={y(tick)} stroke="#1e293b" strokeWidth="1" />
-            <text x={PAD_L - 5} y={y(tick) + 3} textAnchor="end" fontSize="9" fill="#64748b">
+            <line x1={PAD_L} x2={W - PAD_R} y1={y(tick)} y2={y(tick)} stroke="var(--chart-grid)" strokeWidth="1" />
+            <text x={PAD_L - 5} y={y(tick) + 3} textAnchor="end" fontSize="9" fill="var(--chart-axis)">
               {fmt(tick)}
             </text>
           </g>
@@ -104,16 +104,16 @@ export default function TrendChart({ title, unit = '', color = '#34d399', points
         )}
 
         {valid.map((p, i) => (
-          <circle key={`${p.label}-${i}`} cx={x(i)} cy={y(p.value)} r="3" fill="#020617" stroke={color} strokeWidth="2">
+          <circle key={`${p.label}-${i}`} cx={x(i)} cy={y(p.value)} r="3" fill="var(--chart-point)" stroke={color} strokeWidth="2">
             <title>{`${p.label}: ${fmt(p.value)} ${unit}`}</title>
           </circle>
         ))}
 
-        <text x={PAD_L} y={H - 6} fontSize="9" fill="#64748b">
+        <text x={PAD_L} y={H - 6} fontSize="9" fill="var(--chart-axis)">
           {valid[0].label}
         </text>
         {valid.length > 1 && (
-          <text x={W - PAD_R} y={H - 6} textAnchor="end" fontSize="9" fill="#64748b">
+          <text x={W - PAD_R} y={H - 6} textAnchor="end" fontSize="9" fill="var(--chart-axis)">
             {valid[valid.length - 1].label}
           </text>
         )}

@@ -14,7 +14,7 @@ interface Props {
 }
 
 const cellInput =
-  'w-full bg-slate-900 border border-slate-800 rounded-md px-2 py-1.5 text-xs text-center text-white focus:outline-none focus:border-emerald-500';
+  'w-full bg-surface border border-line rounded-md px-2 py-1.5 text-xs text-center text-ink focus:outline-none focus:border-accent';
 
 export default function WorkoutTemplateEditor({
   template,
@@ -24,9 +24,9 @@ export default function WorkoutTemplateEditor({
   onChangeExercise,
 }: Props) {
   return (
-    <div className="bg-slate-900/50 rounded-xl border border-slate-800 p-4 sm:p-5 space-y-4 relative">
+    <div className="bg-surface/50 rounded-xl border border-line p-4 sm:p-5 space-y-4 relative">
       <div>
-        <label className="block text-[11px] font-bold text-slate-400 uppercase tracking-wider mb-1.5">
+        <label className="block text-[11px] font-bold text-ink-muted uppercase tracking-wider mb-1.5">
           Template-Name (erscheint im Kalender)
         </label>
         <input
@@ -38,7 +38,7 @@ export default function WorkoutTemplateEditor({
       </div>
 
       <div className="space-y-2">
-        <div className="hidden sm:grid grid-cols-12 gap-2 px-2 text-[10px] font-bold text-slate-500 uppercase tracking-wider">
+        <div className="hidden sm:grid grid-cols-12 gap-2 px-2 text-[10px] font-bold text-ink-muted uppercase tracking-wider">
           <div className="col-span-6">Übung</div>
           <div className="col-span-2">Sätze</div>
           <div className="col-span-2">Wdh.</div>
@@ -48,14 +48,14 @@ export default function WorkoutTemplateEditor({
         {template.exercises.map((ex, index) => (
           <div
             key={index}
-            className="grid grid-cols-1 sm:grid-cols-12 gap-2 items-center bg-slate-950/50 p-2 sm:p-1 rounded-lg sm:bg-transparent"
+            className="grid grid-cols-1 sm:grid-cols-12 gap-2 items-center bg-canvas/50 p-2 sm:p-1 rounded-lg sm:bg-transparent"
           >
             <div className="sm:col-span-6">
-              <label className="sm:hidden block text-[9px] font-bold text-slate-500 uppercase mb-1">Übung</label>
+              <label className="sm:hidden block text-[9px] font-bold text-ink-muted uppercase mb-1">Übung</label>
               <select
                 value={ex.exercise}
                 onChange={(e) => onChangeExercise(index, 'exercise', e.target.value)}
-                className="w-full bg-slate-900 border border-slate-800 rounded-md px-2 py-1.5 text-xs text-white focus:outline-none focus:border-emerald-500 appearance-none"
+                className="w-full bg-surface border border-line rounded-md px-2 py-1.5 text-xs text-ink focus:outline-none focus:border-accent appearance-none"
               >
                 <option value="">Übung wählen...</option>
                 {EXERCISE_OPTIONS.map((option) => (
@@ -67,7 +67,7 @@ export default function WorkoutTemplateEditor({
             </div>
 
             <div className="sm:col-span-2 flex items-center gap-2 sm:block">
-              <label className="sm:hidden w-16 text-[9px] font-bold text-slate-500 uppercase">Sätze</label>
+              <label className="sm:hidden w-16 text-[9px] font-bold text-ink-muted uppercase">Sätze</label>
               <input
                 type="text"
                 value={ex.sets}
@@ -78,7 +78,7 @@ export default function WorkoutTemplateEditor({
             </div>
 
             <div className="sm:col-span-2 flex items-center gap-2 sm:block">
-              <label className="sm:hidden w-16 text-[9px] font-bold text-slate-500 uppercase">Wdh.</label>
+              <label className="sm:hidden w-16 text-[9px] font-bold text-ink-muted uppercase">Wdh.</label>
               <input
                 type="text"
                 value={ex.reps}
@@ -89,18 +89,18 @@ export default function WorkoutTemplateEditor({
             </div>
 
             <div className="sm:col-span-2 flex items-center gap-2">
-              <label className="sm:hidden w-16 text-[9px] font-bold text-slate-500 uppercase">Gewicht</label>
+              <label className="sm:hidden w-16 text-[9px] font-bold text-ink-muted uppercase">Gewicht</label>
               <input
                 type="text"
                 value={ex.weight}
                 onChange={(e) => onChangeExercise(index, 'weight', e.target.value)}
                 placeholder="kg"
-                className={`${cellInput} text-emerald-400 font-bold`}
+                className={`${cellInput} text-accent font-bold`}
               />
               <button
                 type="button"
                 onClick={() => onRemoveExercise(index)}
-                className="text-slate-500 hover:text-red-400 p-1 transition cursor-pointer"
+                className="text-ink-muted hover:text-danger p-1 transition cursor-pointer"
                 title="Übung entfernen"
               >
                 <Trash2 size={14} />
@@ -112,7 +112,7 @@ export default function WorkoutTemplateEditor({
         <button
           type="button"
           onClick={onAddExercise}
-          className="w-full bg-slate-900/50 hover:bg-slate-900 border border-slate-800 border-dashed text-slate-400 hover:text-emerald-400 py-2 rounded-lg text-xs font-bold transition flex items-center justify-center gap-1.5 cursor-pointer mt-2"
+          className="w-full bg-surface/50 hover:bg-surface border border-line border-dashed text-ink-muted hover:text-accent py-2 rounded-lg text-xs font-bold transition flex items-center justify-center gap-1.5 cursor-pointer mt-2"
         >
           <Plus size={14} /> Übung hinzufügen
         </button>

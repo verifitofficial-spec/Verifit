@@ -4,6 +4,7 @@ import { useCallback, useEffect, useState } from 'react';
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
 import { supabase } from '@/app/lib/supabase';
+import ThemeToggle from '@/components/ThemeToggle';
 import { 
   ShieldCheck, 
   FileText, 
@@ -165,46 +166,47 @@ export default function VerificationPage() {
   };
 
   return (
-    <main className="min-h-screen bg-slate-950 text-white p-6 sm:p-10 selection:bg-emerald-500 selection:text-slate-950">
+    <main className="min-h-screen bg-canvas text-ink p-6 sm:p-10 selection:bg-accent selection:text-primary-foreground">
       <div className="max-w-5xl mx-auto space-y-6">
         
         {/* Header */}
-        <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4 border-b border-slate-800 pb-6">
+        <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4 border-b border-line pb-6">
           <div className="flex items-center gap-3">
-            <div className="p-3 bg-emerald-500/10 text-emerald-400 rounded-2xl border border-emerald-500/20">
+            <div className="p-3 bg-accent-soft text-accent rounded-2xl border border-accent/35">
               <ShieldCheck size={28} />
             </div>
             <div>
-              <h1 className="text-2xl font-bold text-emerald-400 tracking-tight">Trainer Verifizierung</h1>
-              <p className="text-xs text-slate-400 mt-0.5">Admin Control Center – Dokumentenprüfung & Freigaben</p>
+              <h1 className="text-2xl font-bold text-accent tracking-tight">Trainer Verifizierung</h1>
+              <p className="text-xs text-ink-muted mt-0.5">Admin Control Center – Dokumentenprüfung & Freigaben</p>
             </div>
           </div>
           <div className="flex items-center gap-3">
+            <ThemeToggle compact />
             <Link 
               href="/" 
-              className="text-slate-400 hover:text-white text-xs px-3.5 py-2 rounded-xl border border-slate-800 bg-slate-900 transition"
+              className="text-ink-muted hover:text-ink text-xs px-3.5 py-2 rounded-xl border border-line bg-surface transition"
             >
               Zur Startseite
             </Link>
             <button
               onClick={handleLogout}
-              className="bg-slate-900 hover:bg-slate-800 border border-slate-800 text-xs px-4 py-2 rounded-xl transition cursor-pointer text-slate-300 font-medium"
+              className="bg-surface hover:bg-surface-soft border border-line text-xs px-4 py-2 rounded-xl transition cursor-pointer text-ink-soft font-medium"
             >
               Abmelden
             </button>
           </div>
         </div>
 
-        <p className="text-slate-400 text-xs">
+        <p className="text-ink-muted text-xs">
           Jeder Trainer auf VeriFit wird manuell geprüft: Lizenz-PDFs, Haftpflichtversicherung, Stammdaten und fachliche Qualifikation.
         </p>
 
         {loading ? (
           <div className="flex items-center justify-center py-16">
-            <div className="w-8 h-8 border-4 border-emerald-500 border-t-transparent rounded-full animate-spin"></div>
+            <div className="w-8 h-8 border-4 border-accent border-t-transparent rounded-full animate-spin"></div>
           </div>
         ) : trainers.length === 0 ? (
-          <div className="p-8 bg-slate-900 border border-slate-800 rounded-2xl text-center text-slate-400 text-sm">
+          <div className="p-8 bg-surface border border-line rounded-2xl text-center text-ink-muted text-sm">
             Keine registrierten Trainer gefunden.
           </div>
         ) : (
@@ -217,36 +219,36 @@ export default function VerificationPage() {
               return (
                 <div 
                   key={trainer.id} 
-                  className="p-6 bg-slate-900/80 backdrop-blur-md border border-slate-800 rounded-2xl shadow-xl space-y-5"
+                  className="p-6 bg-surface/80 backdrop-blur-md border border-line rounded-2xl shadow-xl space-y-5"
                 >
                   {/* Oberer Bereich: Name, Email & Status */}
-                  <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-3 border-b border-slate-800/80 pb-4">
+                  <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-3 border-b border-line/80 pb-4">
                     <div>
                       <div className="flex items-center gap-3">
-                        <h2 className="text-lg font-bold text-white tracking-tight">
+                        <h2 className="text-lg font-bold text-ink tracking-tight">
                           {trainer.name || 'Unbenannter Trainer'}
                         </h2>
                         <span className={`text-[10px] px-2.5 py-0.5 rounded-full font-bold uppercase tracking-wider ${
                           trainer.status === 'approved' 
-                            ? 'bg-emerald-500/10 text-emerald-400 border border-emerald-500/30' 
+                            ? 'bg-accent-soft text-accent border border-accent/45'
                             : trainer.status === 'rejected'
-                            ? 'bg-red-500/10 text-red-400 border border-red-500/30'
-                            : 'bg-amber-500/10 text-amber-400 border border-amber-500/30'
+                            ? 'bg-danger-soft text-danger border border-danger-line'
+                            : 'bg-warning-soft text-warning border border-warning-line'
                         }`}>
                           {trainer.status === 'approved' ? 'Bestätigt ✓' : trainer.status === 'rejected' ? 'Abgelehnt ✕' : 'Prüfung ausstehend'}
                         </span>
                       </div>
-                      <div className="flex items-center gap-4 text-xs text-slate-400 mt-1">
+                      <div className="flex items-center gap-4 text-xs text-ink-muted mt-1">
                         <span className="flex items-center gap-1.5">
-                          <Mail size={13} className="text-slate-500" /> {trainer.email}
+                          <Mail size={13} className="text-ink-muted" /> {trainer.email}
                         </span>
                         {trainer.city && (
                           <span className="flex items-center gap-1.5">
-                            <MapPin size={13} className="text-slate-500" /> {trainer.city}
+                            <MapPin size={13} className="text-ink-muted" /> {trainer.city}
                           </span>
                         )}
                         {trainer.service_mode && (
-                          <span className="bg-slate-950 border border-slate-800 px-2 py-0.5 rounded text-[11px] text-slate-300">
+                          <span className="bg-canvas border border-line px-2 py-0.5 rounded text-[11px] text-ink-soft">
                             {trainer.service_mode}
                           </span>
                         )}
@@ -257,13 +259,13 @@ export default function VerificationPage() {
                     <div className="flex items-center gap-2 self-end sm:self-center">
                       <button
                         onClick={() => updateTrainerStatus(trainer.id, 'approved')}
-                        className="px-4 py-2 bg-emerald-500 hover:bg-emerald-600 text-slate-950 text-xs font-bold rounded-xl transition cursor-pointer flex items-center gap-1.5 shadow-md shadow-emerald-500/10"
+                        className="px-4 py-2 bg-accent hover:bg-accent-strong text-primary-foreground text-xs font-bold rounded-xl transition cursor-pointer flex items-center gap-1.5"
                       >
                         <CheckCircle size={14} /> Bestätigen
                       </button>
                       <button
                         onClick={() => updateTrainerStatus(trainer.id, 'rejected')}
-                        className="px-4 py-2 bg-slate-950 hover:bg-red-500/20 text-red-400 border border-red-500/30 text-xs font-semibold rounded-xl transition cursor-pointer flex items-center gap-1.5"
+                        className="px-4 py-2 bg-canvas hover:bg-danger-soft text-danger border border-danger-line text-xs font-semibold rounded-xl transition cursor-pointer flex items-center gap-1.5"
                       >
                         <XCircle size={14} /> Ablehnen
                       </button>
@@ -273,14 +275,14 @@ export default function VerificationPage() {
                   {/* Mitte 1: Lizenzen & Dokumente Grid */}
                   <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                     {/* Lizenz-Angaben & PDF */}
-                    <div className="bg-slate-950/80 p-4 rounded-xl border border-slate-800/80 space-y-3">
-                      <div className="flex items-center gap-2 text-xs font-bold uppercase tracking-wider text-emerald-400">
+                    <div className="bg-canvas/80 p-4 rounded-xl border border-line/80 space-y-3">
+                      <div className="flex items-center gap-2 text-xs font-bold uppercase tracking-wider text-accent">
                         <Award size={15} /> Trainerlizenz
                       </div>
                       <div className="text-xs space-y-1">
-                        <p className="text-slate-400">
+                        <p className="text-ink-muted">
                           Lizenznummer / Info:{' '}
-                          <span className="text-slate-200 font-medium">
+                          <span className="text-ink-soft font-medium">
                             {trainer.license_number || 'Keine Angabe'}
                           </span>
                         </p>
@@ -290,26 +292,26 @@ export default function VerificationPage() {
                         <button
                           type="button"
                           onClick={() => handleViewDocument(trainer.license_document_path!)}
-                          className="w-full bg-slate-900 hover:bg-slate-850 border border-emerald-500/30 text-emerald-400 hover:text-emerald-300 px-3 py-2 rounded-xl text-xs font-semibold flex items-center justify-center gap-2 transition cursor-pointer shadow-sm"
+                          className="w-full bg-surface hover:bg-surface-soft border border-accent/45 text-accent px-3 py-2 rounded-xl text-xs font-semibold flex items-center justify-center gap-2 transition cursor-pointer shadow-sm"
                         >
                           <FileText size={14} /> Lizenz-PDF öffnen <ExternalLink size={12} />
                         </button>
                       ) : (
-                        <div className="bg-slate-900/50 border border-slate-800/50 rounded-xl p-2.5 text-center text-xs text-slate-500 italic">
+                        <div className="bg-surface/50 border border-line/50 rounded-xl p-2.5 text-center text-xs text-ink-muted italic">
                           Keine Lizenz-PDF hochgeladen
                         </div>
                       )}
                     </div>
 
                     {/* Versicherungs-Angaben & PDF */}
-                    <div className="bg-slate-950/80 p-4 rounded-xl border border-slate-800/80 space-y-3">
-                      <div className="flex items-center gap-2 text-xs font-bold uppercase tracking-wider text-emerald-400">
+                    <div className="bg-canvas/80 p-4 rounded-xl border border-line/80 space-y-3">
+                      <div className="flex items-center gap-2 text-xs font-bold uppercase tracking-wider text-accent">
                         <Calendar size={15} /> Haftpflichtversicherung
                       </div>
                       <div className="text-xs space-y-1">
-                        <p className="text-slate-400">
+                        <p className="text-ink-muted">
                           Gültig bis:{' '}
-                          <span className="text-slate-200 font-medium">
+                          <span className="text-ink-soft font-medium">
                             {trainer.liability_insurance_expiry 
                               ? new Date(trainer.liability_insurance_expiry).toLocaleDateString('de-DE') 
                               : 'Keine Angabe'}
@@ -321,12 +323,12 @@ export default function VerificationPage() {
                         <button
                           type="button"
                           onClick={() => handleViewDocument(trainer.insurance_document_path!)}
-                          className="w-full bg-slate-900 hover:bg-slate-850 border border-emerald-500/30 text-emerald-400 hover:text-emerald-300 px-3 py-2 rounded-xl text-xs font-semibold flex items-center justify-center gap-2 transition cursor-pointer shadow-sm"
+                          className="w-full bg-surface hover:bg-surface-soft border border-accent/45 text-accent px-3 py-2 rounded-xl text-xs font-semibold flex items-center justify-center gap-2 transition cursor-pointer shadow-sm"
                         >
                           <FileText size={14} /> Versicherungs-PDF öffnen <ExternalLink size={12} />
                         </button>
                       ) : (
-                        <div className="bg-slate-900/50 border border-slate-800/50 rounded-xl p-2.5 text-center text-xs text-slate-500 italic">
+                        <div className="bg-surface/50 border border-line/50 rounded-xl p-2.5 text-center text-xs text-ink-muted italic">
                           Keine Versicherungs-PDF hochgeladen
                         </div>
                       )}
@@ -337,14 +339,14 @@ export default function VerificationPage() {
                   <div className="space-y-3">
                     {specialtiesList.length > 0 && (
                       <div>
-                        <span className="block text-[10px] font-bold uppercase tracking-wider text-slate-400 mb-1.5 flex items-center gap-1">
+                        <span className="block text-[10px] font-bold uppercase tracking-wider text-ink-muted mb-1.5 flex items-center gap-1">
                           <Dumbbell size={12} /> Spezialisierungen ({specialtiesList.length}):
                         </span>
                         <div className="flex flex-wrap gap-1.5">
                           {specialtiesList.map((spec, i) => (
                             <span 
                               key={i} 
-                              className="bg-emerald-500/10 text-emerald-300 border border-emerald-500/20 px-2.5 py-0.5 rounded-lg text-xs font-medium"
+                              className="bg-accent-soft text-accent border border-accent/35 px-2.5 py-0.5 rounded-lg text-xs font-medium"
                             >
                               {spec}
                             </span>
@@ -354,10 +356,10 @@ export default function VerificationPage() {
                     )}
 
                     <div>
-                      <span className="block text-[10px] font-bold uppercase tracking-wider text-slate-400 mb-1">
+                      <span className="block text-[10px] font-bold uppercase tracking-wider text-ink-muted mb-1">
                         Bio / Beschreibung:
                       </span>
-                      <div className="text-slate-300 bg-slate-950/80 p-3.5 rounded-xl text-xs border border-slate-800/80 whitespace-pre-line leading-relaxed">
+                      <div className="text-ink-soft bg-canvas/80 p-3.5 rounded-xl text-xs border border-line/80 whitespace-pre-line leading-relaxed">
                         {trainer.bio || 'Keine Bio angegeben.'}
                       </div>
                     </div>
@@ -365,9 +367,9 @@ export default function VerificationPage() {
 
                   {/* Paket-Info (falls vorhanden) */}
                   {(trainer.package_category || trainer.package_price) && (
-                    <div className="pt-2 border-t border-slate-800/60 flex items-center justify-between text-xs text-slate-400">
-                      <span>Paket: <strong className="text-slate-200">{trainer.package_category || 'Standard'}</strong> ({trainer.package_duration || 'k.A.'})</span>
-                      <span className="text-emerald-400 font-bold">{trainer.package_price ? `${trainer.package_price} €` : 'k.A.'}</span>
+                    <div className="pt-2 border-t border-line/60 flex items-center justify-between text-xs text-ink-muted">
+                      <span>Paket: <strong className="text-ink-soft">{trainer.package_category || 'Standard'}</strong> ({trainer.package_duration || 'k.A.'})</span>
+                      <span className="text-accent font-bold">{trainer.package_price ? `${trainer.package_price} €` : 'k.A.'}</span>
                     </div>
                   )}
                 </div>

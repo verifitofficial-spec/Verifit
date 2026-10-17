@@ -1,20 +1,26 @@
 'use client';
 
 import { useState } from 'react';
-import { Briefcase, Clock, Edit3, Plus, Trash2 } from 'lucide-react';
+import { Briefcase, CircleOff, Clock, Edit3, Plus } from 'lucide-react';
 import type { Feedback, OfferDraft, OfferTemplate } from '@/lib/trainer-dashboard/types';
 import OfferModal from './OfferModal';
 import { FeedbackBox, SectionCard, SectionHeader } from './ui';
 
 interface Props {
   offers: OfferTemplate[];
+  loading: boolean;
+  loadError: string | null;
+  onRetry: () => void;
   onSave: (draft: OfferDraft, editingId: string | null) => Promise<string | null>;
   onDelete: (id: string) => Promise<string | null>;
 }
 
-const EMPTY_DRAFT: OfferDraft = { title: '', type: 'paid', duration: 60, price: 90, description: '' };
+const EMPTY_DRAFT: OfferDraft = {
+  title: '', type: 'paid', duration: 60, price: 90, description: '',
+  serviceMode: '', pricingModel: '', includedSessions: null,
+};
 
-export default function OffersSection({ offers, onSave, onDelete }: Props) {
+export default function OffersSection({ offers, loading, loadError, onRetry, onSave, onDelete }: Props) {
   const [modalOpen, setModalOpen] = useState(false);
   const [editingId, setEditingId] = useState<string | null>(null);
   const [draft, setDraft] = useState<OfferDraft>(EMPTY_DRAFT);
@@ -34,27 +40,33 @@ export default function OffersSection({ offers, onSave, onDelete }: Props) {
       duration: offer.duration,
       price: offer.price,
       description: offer.description,
+      serviceMode: offer.serviceMode ?? '',
+      pricingModel: offer.pricingModel ?? '',
+      includedSessions: offer.includedSessions,
     });
     setModalOpen(true);
   }
 
-  async function handleDelete(offer: OfferTemplate) {
-    if (!window.confirm(`Angebot „${offer.title}“ wirklich löschen? Bestehende Buchungen bleiben erhalten.`)) return;
+  async function handleDeactivate(offer: OfferTemplate) {
+    if (!window.confirm(`Angebot „${offer.title}“ wirklich deaktivieren? Bestehende Kontaktanfragen bleiben erhalten.`)) return;
     const error = await onDelete(offer.id);
-    setFeedback(error ? { type: 'error', text: error } : null);
+    setFeedback(error
+      ? { type: 'error', text: error }
+      : { type: 'success', text: `Angebot „${offer.title}“ wurde deaktiviert.` });
   }
 
   return (
     <SectionCard>
       <SectionHeader
         icon={Briefcase}
-        title="Angebots-Ersteller"
-        description="Erstellung und Verwaltung von Trainer-Paketen und Coaching-Angeboten."
+        title="Angebote"
+        description="Leistungen und Preise für dein öffentliches Profil."
         actions={
           <button
             type="button"
             onClick={openCreate}
-            className="bg-slate-800 hover:bg-slate-700 text-white px-3.5 py-2 rounded-xl text-xs font-semibold flex items-center gap-2 border border-slate-700 transition cursor-pointer shadow-sm"
+            disabled={loading || Boolean(loadError)}
+            className="flex min-h-10 cursor-pointer items-center gap-2 rounded-lg bg-accent px-3.5 py-2 text-xs font-bold text-primary-foreground transition-colors hover:bg-accent-strong"
           >
             <Plus size={14} /> Angebot erstellen
           </button>
@@ -63,24 +75,33 @@ export default function OffersSection({ offers, onSave, onDelete }: Props) {
 
       <FeedbackBox feedback={feedback} />
 
-      {offers.length === 0 ? (
-        <p className="text-xs text-slate-500">
-          Noch keine Angebote. Ohne aktives Angebot können Kunden keine Termine bei dir anfragen.
+      {loading ? (
+        <p className="text-xs text-ink-muted">Angebote werden geladen...</p>
+      ) : loadError ? (
+        <div role="alert" className="border border-danger-line bg-danger-soft p-4 text-sm text-danger">
+          <p>{loadError}</p>
+          <button type="button" onClick={onRetry} className="mt-3 min-h-10 rounded-lg border border-danger-line px-3 py-2 text-xs font-semibold">
+            Erneut versuchen
+          </button>
+        </div>
+      ) : offers.length === 0 ? (
+        <p className="text-xs text-ink-muted">
+          Noch keine Angebote. Kunden können dir trotzdem eine allgemeine Kontaktanfrage senden.
         </p>
       ) : (
         <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
           {offers.map((offer) => (
             <div
               key={offer.id}
-              className="bg-slate-950/80 border border-slate-800/80 rounded-xl p-5 flex flex-col justify-between"
+              className="bg-canvas/80 border border-line/80 rounded-xl p-5 flex flex-col justify-between"
             >
               <div>
                 <div className="flex justify-between items-start mb-3">
                   <span
                     className={`rounded-full border px-2.5 py-1 text-xs font-medium ${
                       offer.type === 'discovery'
-                        ? 'bg-emerald-500/10 text-emerald-400 border border-emerald-500/20'
-                        : 'bg-slate-800 text-slate-300 border-slate-700'
+                        ? 'bg-accent-soft text-accent border border-accent/35'
+                        : 'bg-surface-soft text-ink-soft border-line-strong'
                     }`}
                   >
                     {offer.type === 'discovery' ? 'Kostenlos (0€)' : 'Bezahlt'}
@@ -89,29 +110,43 @@ export default function OffersSection({ offers, onSave, onDelete }: Props) {
                     <button
                       type="button"
                       onClick={() => openEdit(offer)}
-                      className="text-slate-400 hover:text-white p-1 cursor-pointer"
+                      className="text-ink-muted hover:text-ink p-1 cursor-pointer"
                       title="Bearbeiten"
                     >
                       <Edit3 size={14} />
                     </button>
                     <button
                       type="button"
-                      onClick={() => void handleDelete(offer)}
-                      className="text-slate-400 hover:text-red-400 p-1 cursor-pointer"
-                      title="Löschen"
+                      onClick={() => void handleDeactivate(offer)}
+                      className="text-ink-muted hover:text-danger p-1 cursor-pointer"
+                      title="Deaktivieren"
+                      aria-label={`Angebot ${offer.title} deaktivieren`}
                     >
-                      <Trash2 size={14} />
+                      <CircleOff size={14} />
                     </button>
                   </div>
                 </div>
-                <h3 className="text-sm font-bold text-white mb-1">{offer.title}</h3>
-                <p className="text-slate-400 text-xs mb-4">{offer.description}</p>
+                <h3 className="text-sm font-bold text-ink mb-1">{offer.title}</h3>
+                <p className="text-ink-muted text-xs mb-4">{offer.description}</p>
+                <p className="mb-4 text-xs text-ink-muted">
+                  {offer.serviceMode ?? 'Trainingsform noch nicht klassifiziert'}
+                  {' · '}
+                  {offer.type === 'discovery'
+                    ? 'Erstgespräch'
+                    : offer.pricingModel === 'single_session'
+                      ? 'Preis pro Einheit'
+                      : offer.pricingModel === 'monthly'
+                        ? 'Monatliche Pauschale'
+                        : offer.pricingModel === 'package' && offer.includedSessions
+                          ? `Paket mit ${offer.includedSessions} Einheiten`
+                          : 'Abrechnung noch nicht klassifiziert'}
+                </p>
               </div>
-              <div className="pt-3 border-t border-slate-900 flex items-center justify-between">
-                <div className="text-xs text-slate-300 flex items-center gap-1 tabular-nums">
-                  <Clock size={12} className="text-slate-400" /> {offer.duration} Min.
+              <div className="pt-3 border-t border-line flex items-center justify-between">
+                <div className="text-xs text-ink-soft flex items-center gap-1 tabular-nums">
+                  <Clock size={12} className="text-ink-muted" /> {offer.duration} Min.
                 </div>
-                <div className="text-sm font-bold text-emerald-400 tabular-nums">
+                <div className="text-sm font-bold text-accent tabular-nums">
                   {offer.price === 0 ? '0,00 €' : `${offer.price} €`}
                 </div>
               </div>

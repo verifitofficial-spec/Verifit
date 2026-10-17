@@ -20,7 +20,24 @@ const MAX_BYTES = 10 * 1024 * 1024;
 
 export default function DocumentUploadCard({ label, kind, trainerId, path, onPathChange, onFeedback }: Props) {
   const [uploading, setUploading] = useState(false);
-  const dbField = kind === 'license' ? 'license_document_path' : 'insurance_document_path';
+
+  async function saveDocumentPath(nextPath: string | null): Promise<string | null> {
+    const {
+      data: { session },
+    } = await supabase.auth.getSession();
+    if (!session) return 'Deine Sitzung ist abgelaufen. Bitte melde dich erneut an.';
+
+    const response = await fetch('/api/trainer/verification-document', {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        Authorization: `Bearer ${session.access_token}`,
+      },
+      body: JSON.stringify({ kind, path: nextPath }),
+    });
+    const data = (await response.json().catch(() => ({}))) as { error?: string };
+    return response.ok ? null : data.error || 'Dokumentpfad konnte nicht gespeichert werden.';
+  }
 
   async function handleUpload(file: File) {
     if (file.type !== 'application/pdf') {
@@ -48,10 +65,10 @@ export default function DocumentUploadCard({ label, kind, trainerId, path, onPat
       return;
     }
 
-    const { error: dbError } = await supabase.from('trainers').update({ [dbField]: newPath }).eq('id', trainerId);
-    if (dbError) {
+    const saveError = await saveDocumentPath(newPath);
+    if (saveError) {
       await supabase.storage.from(BUCKET).remove([newPath]);
-      onFeedback({ type: 'error', text: 'Fehler beim Speichern des Dokumentpfads: ' + dbError.message });
+      onFeedback({ type: 'error', text: 'Fehler beim Speichern des Dokumentpfads: ' + saveError });
       setUploading(false);
       return;
     }
@@ -70,18 +87,22 @@ export default function DocumentUploadCard({ label, kind, trainerId, path, onPat
     if (!path) return;
     if (!window.confirm('Dokument wirklich entfernen?')) return;
 
+    const saveError = await saveDocumentPath(null);
+    if (saveError) {
+      onFeedback({ type: 'error', text: 'Fehler beim Aktualisieren des Profils: ' + saveError });
+      return;
+    }
+
     const { error: removeError } = await supabase.storage.from(BUCKET).remove([path]);
     if (removeError) {
-      onFeedback({ type: 'error', text: 'Fehler beim Löschen: ' + removeError.message });
-      return;
-    }
-    const { error: dbError } = await supabase.from('trainers').update({ [dbField]: null }).eq('id', trainerId);
-    if (dbError) {
-      onFeedback({ type: 'error', text: 'Fehler beim Aktualisieren des Profils: ' + dbError.message });
-      return;
+      onFeedback({
+        type: 'error',
+        text: 'Der Datenbankeintrag wurde entfernt, die Datei im Speicher konnte aber nicht gelöscht werden.',
+      });
+    } else {
+      onFeedback({ type: 'success', text: 'Dokument entfernt.' });
     }
     onPathChange(null);
-    onFeedback({ type: 'success', text: 'Dokument entfernt.' });
   }
 
   async function handleView() {
@@ -95,31 +116,31 @@ export default function DocumentUploadCard({ label, kind, trainerId, path, onPat
   }
 
   return (
-    <div className="bg-slate-950/80 border border-slate-800 rounded-xl p-5 space-y-3">
-      <label className="block text-xs font-semibold text-slate-400 uppercase tracking-wider">{label}</label>
+    <div className="bg-canvas/80 border border-line rounded-xl p-5 space-y-3">
+      <label className="block text-xs font-semibold text-ink-muted uppercase tracking-wider">{label}</label>
 
       {path ? (
-        <div className="flex items-center justify-between bg-slate-900 border border-emerald-500/30 rounded-xl p-3">
+        <div className="flex items-center justify-between bg-surface border border-accent/45 rounded-xl p-3">
           <button
             type="button"
             onClick={handleView}
-            className="text-xs text-emerald-400 hover:underline flex items-center gap-2 cursor-pointer"
+            className="text-xs text-accent hover:underline flex items-center gap-2 cursor-pointer"
           >
             📄 Dokument ansehen
           </button>
-          <button type="button" onClick={handleDelete} className="text-xs text-red-400 hover:text-red-300 cursor-pointer">
+          <button type="button" onClick={handleDelete} className="text-xs text-danger hover:text-danger cursor-pointer">
             Entfernen
           </button>
         </div>
       ) : (
-        <p className="text-xs text-slate-500">Noch kein Dokument hochgeladen.</p>
+        <p className="text-xs text-ink-muted">Noch kein Dokument hochgeladen.</p>
       )}
 
       <label
         className={`block w-full text-center text-xs font-semibold py-2.5 rounded-xl border transition ${
           uploading
-            ? 'bg-slate-800 border-slate-700 text-slate-500 cursor-not-allowed'
-            : 'bg-slate-900 border-slate-700 text-emerald-400 hover:border-emerald-500/50 cursor-pointer'
+            ? 'bg-surface-soft border-line-strong text-ink-muted cursor-not-allowed'
+            : 'bg-surface border-line-strong text-accent hover:border-accent/65 cursor-pointer'
         }`}
       >
         {uploading ? 'Lade hoch...' : path ? 'Ersetzen' : 'PDF hochladen'}

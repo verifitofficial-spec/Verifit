@@ -51,7 +51,7 @@ export default function WorkoutPlanner({ trainerId, clients }: { trainerId: stri
           onRemove={planner.unassignDate}
         />
 
-        <div className="border-t border-slate-800 pt-6 space-y-4">
+        <div className="border-t border-line pt-6 space-y-4">
           <TemplateBar
             defaults={DEFAULT_NAMES}
             customs={planner.templates.map((t) => t.templateName)}

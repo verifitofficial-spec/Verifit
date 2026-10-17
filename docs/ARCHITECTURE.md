@@ -2,6 +2,18 @@
 
 Dieses Dokument beschreibt **wie** VeriFit technisch aufgebaut ist. Produktziele: `docs/PRD.md`. UI: `docs/DESIGN_SYSTEM.md`. Arbeitsregeln: `AGENTS.md`. Detaildokumente: `docs/payment-flow.md`, `docs/auth-flow.md` (teilweise veraltet), `docs/database-schema.md` (teilweise veraltet), `docs/db/*` (Export).
 
+> **Aktive Lead-MVP-Architektur seit 17.10.2026:** Der ausführbare Kern besteht
+> aus Auth/Profilen, manueller Trainerfreigabe, öffentlichen Trainerdaten,
+> Angeboten, Matching und `inquiries`. Öffentliche Seiten lesen bevorzugt die
+> feldgewhitelistete View `trainers_public`. Solange diese View in einer
+> Altumgebung nachweislich fehlt (`42P01`/`PGRST205`), liest ausschließlich
+> `/api/public/matching-data` mit dem Anon-Schlüssel und expliziter Feldliste aus
+> `trainers`, immer mit `status = approved`. Die Browserkomponenten greifen nie
+> direkt auf die Basistabelle zurück. Buchungs-, Checkout-, Stripe- und
+> Webhook-Routen sind als direkte Zugriffspfade mit HTTP 410 deaktiviert; ihre
+> Beschreibungen weiter unten sind historische beziehungsweise spätere
+> Zielarchitektur.
+
 - Stand: 11.10.2026. Grundlage: Code-Snapshot (ohne `src/lib/constants.ts` und `src/app/api/cancel-booking/route.ts`, die nicht vorlagen), die eine Migration im Repo und der DB-Export `docs/db/*` (Stand 03.10.2026). Es gab **keinen Zugriff** auf die tatsächliche Staging- oder Produktionsdatenbank.
 - Marker: **bestätigt** (Code/Migration), **Export** (nur `docs/db/*`), **Entscheidung**, **geplant**, **offen** – Definition in `AGENTS.md` §2. Zielarchitektur wird nie als umgesetzt dargestellt.
 
@@ -12,9 +24,7 @@ flowchart LR
   B[Browser<br/>Next.js Client Components] -- "anon key, JWT<br/>(RLS-abhängig)" --> S[(Supabase<br/>Postgres, Auth, Storage, Realtime)]
   B -- "Bearer-Token" --> R[Next.js Route Handler<br/>src/app/api/*]
   R -- "service role (server-only)" --> S
-  R --> ST[Stripe<br/>Checkout, Connect Express]
   R --> RS[Resend<br/>E-Mail]
-  ST -- Webhook --> R
 ```
 
 Zwei Zugriffspfade auf Daten: **(A)** der Browser spricht Supabase direkt mit dem anon-Key und dem Nutzer-JWT an; die Datenbank (RLS, Storage-Policies, RPCs) ist dort die einzige Sicherheitsgrenze. **(B)** Mutierende Aktionen mit Geld, Status oder fremden Daten laufen über Route Handler, die das Token prüfen und mit dem Service-Role-Key arbeiten. Pfad (A) ist der größte Risikobereich (§5, §12).
@@ -26,16 +36,19 @@ Zwei Zugriffspfade auf Daten: **(A)** der Browser spricht Supabase direkt mit de
 | Web | Next.js 16.3.4 App Router, React 19.2.8, TypeScript 5 strict |
 | Styling | Tailwind CSS 4 (`@tailwindcss/postcss`), lucide-react |
 | Backend-Dienste | Supabase (`@supabase/supabase-js` 2.x), Region Frankfurt/EU |
-| Zahlungen | `stripe` 22.x (serverseitig; Checkout per Redirect) |
+| Zahlungen | `stripe` 22.x als Legacy-Abhängigkeit; im Lead-MVP deaktiviert |
 | E-Mail | `resend` 6.x |
 | Validierung | zod 4 |
 | Hosting | Vercel (Entscheidung: Pro vor erstem Live-Zahlungsfluss) |
 
-Hinweise: `package.json` hat **kein** `engines`-Feld, Next 16 verlangt Node ≥ 20.9, die Supabase-Pakete im Lockfile Node ≥ 22; Ziel laut `release-plan`: Node 22 in `engines` (**geplant**). `@supabase/ssr` und `@stripe/stripe-js` sind installiert, in den vorliegenden Dateien aber **nicht verwendet** (Session liegt im Standard-Browserspeicher). Es gibt kein Test-Script; Qualitätssicherung heute: `npm run lint`, `npm run build`.
+Hinweise: `package.json` setzt Node ≥ 22 und enthält lokale Unit-/Boundary- sowie PGlite-Baseline-Tests. `@supabase/ssr` und `@stripe/stripe-js` sind installiert, im aktiven Lead-MVP aber nicht verwendet (Session liegt im Standard-Browserspeicher).
 
 ## 3. Umgebungen und Konfiguration
 
 - Umgebungen: lokal, **Staging** (Supabase-Projekt, Arbeitsumgebung), Produktion (nicht anfassen ohne Freigabe).
+- Die aktuelle Pilot-Abnahme, Rollenmatrix und die Grenze zwischen lokalen
+  Belegen und noch offenen Staging-Prüfungen stehen in
+  `docs/lead-mvp-pilot-readiness.md`.
 - Variablennamen (Werte nie ausgeben): `NEXT_PUBLIC_SUPABASE_URL`, `NEXT_PUBLIC_SUPABASE_ANON_KEY`, `SUPABASE_SERVICE_ROLE_KEY` (nur Server), `STRIPE_SECRET_KEY`, `STRIPE_WEBHOOK_SECRET`, `NEXT_PUBLIC_APP_URL` (ohne Slash; Fallback `NEXT_PUBLIC_SITE_URL` in `connect-link`), `RESEND_API_KEY`, `RESEND_FROM_EMAIL` (Fallback `onboarding@resend.dev`; laut Resend-Test-Absender nur eingeschränkt nutzbar, **zu prüfen**), geplant `CRON_SECRET`, `PLATFORM_FEE_PERCENT`. Eine `.env.example` fehlt (**geplant**).
 - `src/app/lib/supabase.ts` fällt ohne Umgebungsvariablen auf Platzhalter-URL/-Key zurück (für deterministische Builds); in Deployments müssen die Variablen gesetzt sein, sonst laufen Browser-Aufrufe ins Leere.
 - Supabase-Auth-Einstellungen (Redirect-URLs, Site-URL, E-Mail-Bestätigung, SMTP, Rate-Limits) liegen im Dashboard, nicht im Repo (**offen**, §12.4).
@@ -66,7 +79,7 @@ Jede Zeile „Browser direkt“ ist **ohne passende RLS-Policy nicht abgesichert
 |---|---|---|
 | `profiles` | SELECT eigene Zeile (`useAuthProfile`, Logins) | Rolle schreibt nur der Auth-Trigger |
 | `clients` | SELECT/UPDATE eigene Zeile (Client-Dashboard); SELECT durch Trainer (`useClients`, `Chat`, Kundenübersicht) | Insert via Trigger/`book-slot` liest per Admin |
-| `trainers` | SELECT öffentlich (Liste, Profil, Quiz, Admin-Seite `select('*')`); UPDATE eigene Zeile (Profil, Fachgebiete, Lizenzfelder, Avatar, Dokumentpfade) | `status` via `admin/trainer-status`; Stripe-Felder via `stripe/*` |
+| `trainers` | SELECT öffentlich lokal auf `trainers_public` umgestellt (mit eng kontrolliertem Vor-Migrations-Fallback); Basistabelle für Owner/Admin; UPDATE eigene unkritische Profil-, Fachgebiets-, Lizenzdetail- und Avatarfelder | `status` via `admin/trainer-status`; Stripe-Felder via `stripe/*`; Dokumentpfade via `trainer/verification-document` |
 | `trainer_offers` | SELECT öffentlich, CRUD eigene (`useTrainerSchedule`) | – |
 | `trainer_slots` | SELECT öffentlich, INSERT/DELETE eigene freie Slots | Statuswechsel `free/pending/booked` serverseitig (Admin-Client, RPC) |
 | `bookings` | nur SELECT (Kunde, Trainer) | INSERT/UPDATE: `book-slot`, `respond_to_booking`, `cancel_booking`, Checkout, Webhook, `delete-account` |
@@ -94,8 +107,8 @@ Route-Handler-Muster (**bestätigt**): `getRequestAuthentication` (Token per `ad
 |---|---|
 | `profiles` | `id` (= Auth-ID), `email`, `role` |
 | `clients` | `id`, `email`, `name`, `share_data`, `height`, `age`, `gender`, `goal`, `activity_level`, `weight` |
-| `trainers` | `id`, `name`, `email`, `bio`, `status` (`pending/approved/rejected`), `city`, `service_mode`, `specialties` (Komma-String), `license_number`, `liability_insurance_expiry`, `license_document_path`, `insurance_document_path`, `avatar_url`, `hourly_rate`, `qualifications`, `instagram_url`, `tiktok_url`, `stripe_account_id`, `charges_enabled`; Legacy: `package_*`, `document_url`, `availability_status` |
-| `trainer_offers` | `trainer_id`, `title`, `type` (`discovery/paid`), `duration_minutes`, `price`, `description`, `is_active` |
+| `trainers` | `id`, `name`, `email`, `bio`, `status` (`pending/approved/rejected`), `city`, `service_mode` (allgemeine Profilangabe, nicht der harte Angebotsfilter), `specialties` (Komma-String), `target_levels` (Phase-3-Migration vorbereitet, Live-Stand ungeprüft), `license_number`, `liability_insurance_expiry`, `license_document_path`, `insurance_document_path`, `avatar_url`, `hourly_rate`, `qualifications`, `instagram_url`, `tiktok_url`, `stripe_account_id`, `charges_enabled`; Legacy: `package_*`, `document_url`, `availability_status` |
+| `trainer_offers` | `trainer_id`, `title`, `type` (`discovery/paid`), `duration_minutes`, `price`, `description`, `is_active`; Phase-3-Migration ergänzt `service_mode` (konkrete Angebotsform und harter Matching-Filter), `pricing_model`, `included_sessions` (Live-Stand ungeprüft) |
 | `trainer_slots` | `trainer_id`, `slot_date`, `slot_time`, `status` (`free/pending/booked`); Legacy-Spalten `is_booked`, `title`, `price`, `client_name`, `client_email` |
 | `bookings` | Snapshot (`offer_title`, `offer_type`, `duration_minutes`, `price`, `slot_date`, `slot_time`, `client_name`, `client_email`), `slot_id`, `offer_id`, `status` (`pending/accepted/confirmed/declined/cancelled/expired`), `payment_due_at`, `responded_at`, `paid_at`, Stripe-IDs; `cancelled_at` wird vom Code geschrieben |
 | `client_plans` | `trainer_id`, `user_id`, `plan_type` (`workout/nutrition`), `title`, `content` (JSON-String), `created_at` |
@@ -136,21 +149,21 @@ stateDiagram-v2
 
 ## 9. Trainerverifizierung und Storage
 
-- Ablauf (**bestätigt**): Trainer lädt PDFs in `verification-docs` unter `<trainerId>/<kind>-<timestamp>.pdf` (Prüfung PDF/10 MB nur im Browser), speichert den Pfad in `trainers`. Admin-Route erzeugt Signed URL (60 s) nur für Pfade, die in `trainers.license_document_path` oder `insurance_document_path` stehen. Trainer-Ansicht eigener Dokumente per `createSignedUrl` im Browser (nur eigener Ordner laut Policy).
+- Ablauf (**lokaler Code, remote noch nicht ausgerollt**): Trainer lädt PDFs in `verification-docs` unter `<trainerId>/<kind>-<timestamp>.pdf` (Prüfung PDF/10 MB im Browser). Der neue Route Handler `trainer/verification-document` prüft Rolle, Eigentümerpfad und Storage-Existenz und speichert ausschließlich den eigenen Dokumentpfad mit dem Server-Client. Admin-Route erzeugt Signed URL (60 s) nur für Pfade, die in `trainers.license_document_path` oder `insurance_document_path` stehen. Trainer-Ansicht eigener Dokumente erfolgt per `createSignedUrl` im Browser (nur eigener Ordner laut exportierter Policy).
 - Policies laut **Export**: `verification-docs` – Admin liest alle, Trainer lesen/löschen/laden im eigenen Ordner; `trainer-documents` – Lesen und Hochladen ohne Nutzereinschränkung (Bucket im Code **unbenutzt**, Existenz/Inhalt unbekannt). Bucket-Limits (Größe, MIME) und `avatars`-Policies sind nicht exportiert (**offen**). Ausweis-Upload und Löschung nach Prüfung sind **geplant**.
 - `avatars`: öffentlicher Bucket (Annahme laut Code `getPublicUrl`), Schreiben im Ordner `<trainerId>/` (Policy **nicht** belegt).
 
 ## 10. Chat, Realtime, E-Mail
 
-- Chat (`Chat.tsx`): Kontakte per Direktabfrage (Trainer → `clients`, Kunde → **alle** `trainers`), Nachrichten per `.or(and(sender…),and(…))`, Realtime-Kanal `chat_messages` auf `INSERT` ohne serverseitigen Filter, clientseitige Filterung. Nach Supabase-Dokumentation respektiert `postgres_changes` RLS-SELECT-Policies (nicht selbst geprüft); ob `messages` in der Publication `supabase_realtime` steht, ist **offen** (Export fehlt). Die UUID-Interpolation in `.or()` ist unkritisch (UUIDs aus der Datenbank).
+- Chat (`Chat.tsx`): Kontakte per Direktabfrage (Trainer → `clients`, Kunde → freigegebene Namen aus `trainers_public`; vor Migration kontrollierter Fallback ohne Trainer-E-Mail), Nachrichten per `.or(and(sender…),and(…))`, Realtime-Kanal `chat_messages` auf `INSERT` ohne serverseitigen Filter, clientseitige Filterung. Nach Supabase-Dokumentation respektiert `postgres_changes` RLS-SELECT-Policies (nicht selbst geprüft); ob `messages` in der Publication `supabase_realtime` steht, ist **offen** (Export fehlt). Die UUID-Interpolation in `.or()` ist unkritisch (UUIDs aus der Datenbank).
 - E-Mail: Resend aus Route Handlern (Buchung, Antwort, Zahlung, Trainer-Status). Nutzer-/DB-Inhalte werden mit `escapeHtml` escaped (**bestätigt**); Mailfehler machen Statusänderungen nicht rückgängig. Hinweis: Trainer-Mails gehen an `trainers.email` – ein Wert, den ein Trainer selbst setzt.
 
 ## 11. Tests, Migrationen, Deployment
 
-- Tests: keine automatisierten Tests erkennbar. **Geplant:** RLS-Tests in `supabase/tests/rls` mit `anon`, Client A/B, Trainer A/B, Admin (erwartete Ergebnisse als Matrix im PR).
-- Migrationen: Ziel ist vollständige, idempotente, kommentierte Schema-Quelle in `supabase/migrations/`; heute **eine** Datei. Ausführung zuerst in Staging, nie nur im Dashboard (`AGENTS.md` §5).
+- Tests: Phase 3 ergänzt lokale Unit-Tests für Matching, Preisvergleich, Schema-Fallback und zukünftige Verfügbarkeit. Pakete bleiben ohne Laufzeitangabe auch bei passender Einheitenzahl monatlich nicht vergleichbar. **Weiter geplant:** RLS-Tests in `supabase/tests/rls` mit `anon`, Client A/B, Trainer A/B, Admin (erwartete Ergebnisse als Matrix im PR).
+- Migrationen: Ziel ist vollständige, idempotente, kommentierte Schema-Quelle in `supabase/migrations/`. Lokal vorbereitet und noch nicht remote ausgeführt sind die Phase-3-Migration für Matching-Metadaten sowie die nachgelagerte Least-Privilege-Migration für `trainers`/`trainer_offers`. Weil aktuell keine separate Staging-Datenbank verfügbar ist, dokumentiert `docs/db/trainers-offers-security-rollout.md` Diagnose, Expand/Contract-Reihenfolge, Rollenmatrix und Notfall-Rollback. Migrationen nie ungeprüft nur im Dashboard ausführen (`AGENTS.md` §5).
 - Deployment: Vercel; Produktionsdeployments und Änderungen an Produktionskonfiguration nur nach Freigabe. Go-Live-Checkliste (**geplant**, `docs/RELEASE-REPORT.md`): Stripe Live-Keys + Webhook, Vercel Pro, Supabase Pro/Backups, Site-URL/Redirects, SMTP, DNS, Impressum.
-- Build-Beobachtung (**zu verifizieren mit `npm run build`**): `src/app/trainer/[id]/page.tsx` importiert `parseSpecialties` aus `@/lib/trainer-dashboard/utils`, wo es im Snapshot nicht exportiert wird (das Quiz importiert es aus `@/lib/constants`, Datei nicht vorliegend).
+- `parseSpecialties` wird in Quiz und öffentlichem Trainerprofil aus der gemeinsamen Quelle `src/lib/constants.ts` importiert.
 
 ## 12. Sicherheitsstatus
 

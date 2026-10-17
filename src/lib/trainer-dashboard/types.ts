@@ -1,8 +1,13 @@
+import type { ExperienceLevel, PricingModel as MatchingPricingModel, ServiceMode } from '@/lib/matching';
+
 export type Feedback = { type: 'success' | 'error'; text: string } | null;
 
 export type BookingStatus = 'pending' | 'accepted' | 'confirmed' | 'declined' | 'cancelled' | 'expired';
 export type OfferType = 'discovery' | 'paid';
 export type SlotStatus = 'free' | 'pending' | 'booked';
+export type TrainerLevel = ExperienceLevel;
+export type OfferServiceMode = ServiceMode;
+export type PricingModel = MatchingPricingModel;
 
 export interface TrainerProfile {
   id: string;
@@ -12,6 +17,7 @@ export interface TrainerProfile {
   status: string | null;
   city: string | null;
   service_mode: string | null;
+  target_levels: TrainerLevel[] | null;
   specialties: string | null;
   license_number: string | null;
   liability_insurance_expiry: string | null;
@@ -29,6 +35,9 @@ export interface OfferTemplate {
   duration: number;
   price: number;
   description: string;
+  serviceMode: OfferServiceMode | null;
+  pricingModel: PricingModel | null;
+  includedSessions: number | null;
 }
 
 export interface OfferDraft {
@@ -37,6 +46,9 @@ export interface OfferDraft {
   duration: number;
   price: number;
   description: string;
+  serviceMode: OfferServiceMode | '';
+  pricingModel: PricingModel | '';
+  includedSessions: number | null;
 }
 
 export interface Booking {

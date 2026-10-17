@@ -21,26 +21,26 @@ export default function MealItemRow({ item, mealIndex, itemIndex, foods, actions
     : [];
 
   return (
-    <div className="grid grid-cols-1 sm:grid-cols-12 gap-2 items-center bg-slate-900/50 p-2 rounded-lg relative">
+    <div className="grid grid-cols-1 sm:grid-cols-12 gap-2 items-center bg-surface/50 p-2 rounded-lg relative">
       <div className="sm:col-span-5 relative">
-        <label className="sm:hidden block text-[9px] font-bold text-slate-500 uppercase mb-1">Lebensmittel</label>
+        <label className="sm:hidden block text-[9px] font-bold text-ink-muted uppercase mb-1">Lebensmittel</label>
         <input
           type="text"
           value={item.foodSearchInput}
           onChange={(e) => actions.changeSearch(mealIndex, itemIndex, e.target.value)}
           placeholder="Suchen... (z.B. Haferflocken)"
-          className="w-full bg-slate-950 border border-slate-800 rounded-md px-2 py-1.5 text-xs text-white focus:outline-none focus:border-emerald-500"
+          className="w-full bg-canvas border border-line rounded-md px-2 py-1.5 text-xs text-ink focus:outline-none focus:border-accent"
         />
         {suggestions.length > 0 && (
-          <div className="absolute z-10 w-full mt-1 bg-slate-800 border border-slate-700 rounded-md shadow-xl max-h-40 overflow-y-auto">
+          <div className="absolute z-10 w-full mt-1 bg-surface-soft border border-line-strong rounded-md shadow-xl max-h-40 overflow-y-auto">
             {suggestions.map((food) => (
               <button
                 key={food.id}
                 type="button"
                 onClick={() => actions.selectFood(mealIndex, itemIndex, food)}
-                className="w-full text-left px-3 py-2 text-xs hover:bg-emerald-500/20 hover:text-emerald-300 border-b border-slate-700/50 last:border-0"
+                className="w-full text-left px-3 py-2 text-xs hover:bg-accent-soft hover:text-accent border-b border-line-strong/50 last:border-0"
               >
-                {food.name} <span className="text-[10px] text-slate-400">({food.kcal} kcal/100g)</span>
+                {food.name} <span className="text-[10px] text-ink-muted">({food.kcal} kcal/100g)</span>
               </button>
             ))}
           </div>
@@ -48,24 +48,24 @@ export default function MealItemRow({ item, mealIndex, itemIndex, foods, actions
       </div>
 
       <div className="sm:col-span-2 flex items-center gap-2">
-        <label className="sm:hidden w-16 text-[9px] font-bold text-slate-500 uppercase">Menge (g)</label>
+        <label className="sm:hidden w-16 text-[9px] font-bold text-ink-muted uppercase">Menge (g)</label>
         <input
           type="number"
           min="0"
           value={item.grams}
           onChange={(e) => actions.changeGrams(mealIndex, itemIndex, e.target.value)}
-          className="w-full bg-slate-950 border border-slate-800 rounded-md px-2 py-1.5 text-xs text-center text-white focus:outline-none focus:border-emerald-500"
+          className="w-full bg-canvas border border-line rounded-md px-2 py-1.5 text-xs text-center text-ink focus:outline-none focus:border-accent"
         />
       </div>
 
       {[
-        { label: 'Kcal', value: item.calories, className: 'font-bold text-emerald-400' },
-        { label: 'Protein', value: item.protein, className: 'text-slate-300' },
-        { label: 'Carbs', value: item.carbs, className: 'text-slate-300' },
-        { label: 'Fett', value: item.fat, className: 'text-slate-300' },
+        { label: 'Kcal', value: item.calories, className: 'font-bold text-accent' },
+        { label: 'Protein', value: item.protein, className: 'text-ink-soft' },
+        { label: 'Carbs', value: item.carbs, className: 'text-ink-soft' },
+        { label: 'Fett', value: item.fat, className: 'text-ink-soft' },
       ].map((cell) => (
         <div key={cell.label} className="sm:col-span-1 flex justify-between sm:block text-right">
-          <span className="sm:hidden text-[9px] font-bold text-slate-500 uppercase">{cell.label}</span>
+          <span className="sm:hidden text-[9px] font-bold text-ink-muted uppercase">{cell.label}</span>
           <span className={`text-xs ${cell.className}`}>{cell.value || 0}</span>
         </div>
       ))}
@@ -74,7 +74,7 @@ export default function MealItemRow({ item, mealIndex, itemIndex, foods, actions
         <button
           type="button"
           onClick={() => actions.removeItem(mealIndex, itemIndex)}
-          className="text-slate-500 hover:text-red-400 p-1 cursor-pointer"
+          className="text-ink-muted hover:text-danger p-1 cursor-pointer"
           title="Zutat entfernen"
         >
           <Trash2 size={14} />

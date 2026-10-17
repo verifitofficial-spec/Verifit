@@ -29,42 +29,42 @@ export default function BookingRequests({ bookings, onRespond }: Props) {
       <FeedbackBox feedback={feedback} />
 
       {bookings.length === 0 ? (
-        <div className="text-center py-10 bg-slate-950/60 rounded-2xl border border-slate-800/80">
-          <CalendarIcon className="mx-auto h-8 w-8 text-slate-600 mb-2" />
-          <p className="text-slate-400 text-xs">Noch keine Anfragen oder Termine.</p>
+        <div className="text-center py-10 bg-canvas/60 rounded-2xl border border-line/80">
+          <CalendarIcon className="mx-auto h-8 w-8 text-ink-muted mb-2" />
+          <p className="text-ink-muted text-xs">Noch keine Anfragen oder Termine.</p>
         </div>
       ) : (
         bookings.map((booking) => {
           return (
             <div
               key={booking.id}
-              className="bg-slate-950/80 border border-slate-800/80 rounded-xl p-5 flex flex-col md:flex-row justify-between items-start md:items-center gap-4"
+              className="bg-canvas/80 border border-line/80 rounded-xl p-5 flex flex-col md:flex-row justify-between items-start md:items-center gap-4"
             >
               <div className="space-y-2">
                 <div className="flex items-center gap-3">
                   <span
                     className={`rounded-full border px-2.5 py-1 text-xs font-medium ${
                       booking.offer_type === 'discovery'
-                        ? 'bg-emerald-500/10 text-emerald-400 border border-emerald-500/20'
-                        : 'bg-slate-800 text-slate-300 border-slate-700'
+                        ? 'bg-accent-soft text-accent border border-accent/35'
+                        : 'bg-surface-soft text-ink-soft border-line-strong'
                     }`}
                   >
                     {booking.offer_type === 'discovery' ? 'Kostenlos' : 'Kostenpflichtig'}
                   </span>
                   <BookingStatusBadge status={booking.status} audience="trainer" paid={booking.price > 0} />
                 </div>
-                <h3 className="text-sm font-bold text-white">{booking.offer_title}</h3>
-                <div className="flex flex-wrap items-center gap-4 text-xs text-slate-300 tabular-nums">
-                  <span className="flex items-center gap-1 text-emerald-300 font-medium">
+                <h3 className="text-sm font-bold text-ink">{booking.offer_title}</h3>
+                <div className="flex flex-wrap items-center gap-4 text-xs text-ink-soft tabular-nums">
+                  <span className="flex items-center gap-1 text-accent font-medium">
                     <User size={12} /> {booking.client_name}
                   </span>
-                  <span className="flex items-center gap-1 text-slate-400">
+                  <span className="flex items-center gap-1 text-ink-muted">
                     <CalendarIcon size={12} /> {formatDateDE(booking.slot_date)}, {booking.slot_time.slice(0, 5)} Uhr
                   </span>
-                  <span className="flex items-center gap-1 text-slate-400">
+                  <span className="flex items-center gap-1 text-ink-muted">
                     <Clock size={12} /> {booking.duration_minutes} Min.
                   </span>
-                  <span className="flex items-center gap-1 font-semibold text-emerald-400">
+                  <span className="flex items-center gap-1 font-semibold text-accent">
                     <DollarSign size={12} /> {booking.price > 0 ? `${booking.price} €` : '0 €'}
                   </span>
                 </div>
@@ -76,7 +76,7 @@ export default function BookingRequests({ bookings, onRespond }: Props) {
                     type="button"
                     disabled={busyId === booking.id}
                     onClick={() => void respond(booking.id, true)}
-                    className="bg-emerald-600 hover:bg-emerald-500 text-white px-3 py-1.5 rounded-lg text-xs font-medium flex items-center gap-1 transition cursor-pointer disabled:opacity-60"
+                    className="bg-accent-strong hover:bg-accent text-ink px-3 py-1.5 rounded-lg text-xs font-medium flex items-center gap-1 transition cursor-pointer disabled:opacity-60"
                   >
                     <CheckCircle size={12} /> Annehmen
                   </button>
@@ -84,7 +84,7 @@ export default function BookingRequests({ bookings, onRespond }: Props) {
                     type="button"
                     disabled={busyId === booking.id}
                     onClick={() => void respond(booking.id, false)}
-                    className="bg-red-500/10 hover:bg-red-500/20 text-red-400 border border-red-500/30 px-3 py-1.5 rounded-lg text-xs font-medium flex items-center gap-1 transition cursor-pointer disabled:opacity-60"
+                    className="bg-danger-soft hover:bg-danger-soft text-danger border border-danger-line px-3 py-1.5 rounded-lg text-xs font-medium flex items-center gap-1 transition cursor-pointer disabled:opacity-60"
                   >
                     <XCircle size={12} /> Ablehnen
                   </button>

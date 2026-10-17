@@ -33,7 +33,7 @@ export default function TemplateBar({
   return (
     <>
       <div className="space-y-2">
-        <span className="text-xs font-semibold text-slate-400 uppercase tracking-wider">
+        <span className="text-xs font-semibold text-ink-muted uppercase tracking-wider">
           Vorgaben (Klick zum Überschreiben des Editors):
         </span>
         <div className="flex flex-wrap gap-2">
@@ -42,7 +42,7 @@ export default function TemplateBar({
               key={`default-${index}`}
               type="button"
               onClick={() => onSelectDefault(index)}
-              className="bg-slate-900 border border-slate-800 hover:border-emerald-500/50 text-slate-300 hover:text-emerald-400 px-3 py-1.5 rounded-lg text-xs font-semibold transition cursor-pointer"
+              className="bg-surface border border-line hover:border-accent/65 text-ink-soft hover:text-accent px-3 py-1.5 rounded-lg text-xs font-semibold transition cursor-pointer"
             >
               {name}
             </button>
@@ -50,15 +50,15 @@ export default function TemplateBar({
         </div>
       </div>
 
-      <div className="border-t border-slate-800/80 pt-4 space-y-4">
+      <div className="border-t border-line/80 pt-4 space-y-4">
         <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-3">
-          <span className="text-xs font-semibold text-emerald-400 uppercase tracking-wider flex items-center gap-2">
+          <span className="text-xs font-semibold text-accent uppercase tracking-wider flex items-center gap-2">
             <Icon size={14} /> {customLabel}
           </span>
           <button
             type="button"
             onClick={onAdd}
-            className="bg-emerald-500/10 hover:bg-emerald-500/20 text-emerald-400 border border-emerald-500/30 px-3 py-1.5 rounded-lg text-[11px] font-bold transition flex items-center gap-1 cursor-pointer"
+            className="bg-accent-soft hover:bg-accent-soft text-accent border border-accent/45 px-3 py-1.5 rounded-lg text-[11px] font-bold transition flex items-center gap-1 cursor-pointer"
           >
             <Plus size={12} /> {addLabel}
           </button>
@@ -70,15 +70,15 @@ export default function TemplateBar({
               key={`custom-${index}`}
               draggable
               onDragStart={(e) => e.dataTransfer.setData('text/plain', name)}
-              className={`flex items-center bg-slate-950/80 border rounded-lg overflow-hidden transition cursor-grab active:cursor-grabbing ${
-                index === activeIndex ? 'border-emerald-500 shadow-md shadow-emerald-500/10' : 'border-slate-800'
+              className={`flex items-center bg-canvas/80 border rounded-lg overflow-hidden transition cursor-grab active:cursor-grabbing ${
+                index === activeIndex ? 'border-accent shadow-sm' : 'border-line'
               }`}
             >
               <button
                 type="button"
                 onClick={() => onSelect(index)}
                 className={`px-3 py-1.5 text-xs font-bold transition ${
-                  index === activeIndex ? 'bg-emerald-500/10 text-emerald-400' : 'text-slate-400 hover:text-white'
+                  index === activeIndex ? 'bg-accent-soft text-accent' : 'text-ink-muted hover:text-ink'
                 }`}
               >
                 {name}
@@ -86,7 +86,7 @@ export default function TemplateBar({
               <button
                 type="button"
                 onClick={() => onRemove(index)}
-                className="px-2 py-1.5 text-red-400/50 hover:text-red-400 hover:bg-red-500/10 transition cursor-pointer"
+                className="px-2 py-1.5 text-danger/50 hover:text-danger hover:bg-danger-soft transition cursor-pointer"
                 title={removeTitle}
               >
                 &times;

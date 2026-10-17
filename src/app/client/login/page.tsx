@@ -100,27 +100,27 @@ function ClientLoginForm() {
   }
 
   return (
-    <AuthShell eyebrow="Kundenbereich" title="Willkommen zurück." description={next ? 'Melde dich an, um deine ausgewählte Buchung fortzusetzen.' : 'Melde dich an und behalte Termine, Pläne und Fortschritte an einem Ort im Blick.'}>
+    <AuthShell eyebrow="Kundenbereich" title="Willkommen zurück." description={next ? 'Melde dich an, um deine Kontaktanfrage fortzusetzen.' : 'Melde dich an und behalte deine unverbindlichen Kontaktanfragen im Blick.'}>
 
           {errorMessage && (
-            <div className="mb-4 p-3 bg-red-500/10 border border-red-500/20 rounded-xl text-red-400 text-xs space-y-2">
+            <div className="mb-4 p-3 bg-danger-soft border border-danger-line rounded-xl text-danger text-xs space-y-2">
               <p>{errorMessage}</p>
               {canResend && (
-                <button type="button" onClick={handleResend} className="underline text-red-300 cursor-pointer">
+                <button type="button" onClick={handleResend} className="underline text-danger cursor-pointer">
                   Bestätigungs-E-Mail erneut senden
                 </button>
               )}
             </div>
           )}
           {infoMessage && (
-            <div className="mb-4 p-3 bg-emerald-500/10 border border-emerald-500/20 rounded-xl text-emerald-400 text-xs">
+            <div className="mb-4 p-3 bg-accent-soft border border-accent/35 rounded-xl text-accent text-xs">
               {infoMessage}
             </div>
           )}
 
           <form onSubmit={handleLogin} className="space-y-4" noValidate>
             <div>
-              <label htmlFor="client-login-email" className="block text-xs font-semibold text-slate-400 uppercase tracking-wider mb-2">
+              <label htmlFor="client-login-email" className="block text-xs font-semibold text-ink-muted uppercase tracking-wider mb-2">
                 E-Mail-Adresse
               </label>
               <input
@@ -131,14 +131,14 @@ function ClientLoginForm() {
                 placeholder="name@example.com"
                 value={email}
                 onChange={(e) => setEmail(e.target.value)}
-                className={`w-full bg-slate-950 border rounded-xl px-4 py-3 text-sm text-white focus:outline-none transition ${
-                  fieldErrors.email ? 'border-red-500/60 focus:border-red-500' : 'border-slate-800 focus:border-emerald-500'
+                className={`w-full bg-canvas border rounded-xl px-4 py-3 text-sm text-ink focus:outline-none transition ${
+                  fieldErrors.email ? 'border-danger-line focus:border-danger-line' : 'border-line focus:border-accent'
                 }`}
               />
               <FormFieldError id="client-login-email-error" message={fieldErrors.email} />
             </div>
             <div>
-              <label htmlFor="client-login-password" className="block text-xs font-semibold text-slate-400 uppercase tracking-wider mb-2">
+              <label htmlFor="client-login-password" className="block text-xs font-semibold text-ink-muted uppercase tracking-wider mb-2">
                 Passwort
               </label>
               <input
@@ -149,13 +149,13 @@ function ClientLoginForm() {
                 placeholder="••••••••"
                 value={password}
                 onChange={(e) => setPassword(e.target.value)}
-                className={`w-full bg-slate-950 border rounded-xl px-4 py-3 text-sm text-white focus:outline-none transition ${
-                  fieldErrors.password ? 'border-red-500/60 focus:border-red-500' : 'border-slate-800 focus:border-emerald-500'
+                className={`w-full bg-canvas border rounded-xl px-4 py-3 text-sm text-ink focus:outline-none transition ${
+                  fieldErrors.password ? 'border-danger-line focus:border-danger-line' : 'border-line focus:border-accent'
                 }`}
               />
               <FormFieldError id="client-login-password-error" message={fieldErrors.password} />
-              <div className="text-right mt-2">
-                <Link href="/forgot-password" className="text-xs text-slate-400 hover:text-emerald-400 transition">
+              <div className="mt-2 flex justify-end">
+                <Link href="/forgot-password" className="inline-flex min-h-11 items-center text-xs text-ink-muted transition hover:text-accent">
                   Passwort vergessen?
                 </Link>
               </div>
@@ -163,15 +163,15 @@ function ClientLoginForm() {
             <button
               type="submit"
               disabled={loading}
-              className="w-full bg-emerald-500 hover:bg-emerald-600 text-slate-950 font-bold py-3 rounded-xl text-sm transition cursor-pointer disabled:opacity-60"
+              className="w-full bg-accent hover:bg-accent-strong text-primary-foreground font-bold py-3 rounded-xl text-sm transition cursor-pointer disabled:opacity-60"
             >
               {loading ? 'Logge ein...' : 'Anmelden'}
             </button>
           </form>
 
-          <div className="mt-6 text-center text-xs text-slate-500">
+          <div className="mt-6 text-center text-xs text-ink-muted">
             Noch kein Konto?{' '}
-            <Link href={withNext('/client/register', next)} className="text-emerald-400 hover:underline">
+            <Link href={withNext('/client/register', next)} className="text-accent hover:underline">
               Jetzt registrieren
             </Link>
           </div>
@@ -181,7 +181,7 @@ function ClientLoginForm() {
 
 export default function ClientLoginPage() {
   return (
-    <Suspense fallback={<div className="min-h-screen bg-slate-950" />}>
+    <Suspense fallback={<div className="min-h-screen bg-canvas" />}>
       <ClientLoginForm />
     </Suspense>
   );

@@ -84,16 +84,15 @@ export default function ProfileSection({ trainer, onChange }: Props) {
     <SectionCard>
       <SectionHeader
         icon={ShieldCheck}
-        level={1}
-        title="Persönliche Angaben (Profilbild, Stammdaten, Name, etc.)"
-        description="Pflege deinen vollständigen Namen, Standort und deine Kurzbeschreibung."
+        title="Profil"
+        description="Öffentliche Angaben für Trainerliste und Matching."
       />
 
       <FeedbackBox feedback={feedback} />
 
-      <form onSubmit={handleSubmit} className="space-y-6">
-        <div className="flex flex-col sm:flex-row items-start sm:items-center gap-4 bg-slate-950/70 border border-slate-800 rounded-xl p-4">
-          <div className="w-20 h-20 rounded-2xl overflow-hidden bg-slate-800 border border-slate-700 flex items-center justify-center text-2xl font-bold text-emerald-400 shrink-0">
+      <form onSubmit={handleSubmit} className="space-y-5">
+        <div className="flex flex-col sm:flex-row items-start sm:items-center gap-4 bg-canvas/70 border border-line rounded-xl p-4">
+          <div className="w-20 h-20 rounded-2xl overflow-hidden bg-surface-soft border border-line-strong flex items-center justify-center text-2xl font-bold text-accent shrink-0">
             {trainer.avatar_url ? (
               // eslint-disable-next-line @next/next/no-img-element
               <img src={trainer.avatar_url} alt="Aktuelles Profilbild" className="w-full h-full object-cover" />
@@ -102,8 +101,8 @@ export default function ProfileSection({ trainer, onChange }: Props) {
             )}
           </div>
           <div className="space-y-2">
-            <p className="text-xs text-slate-300">Dieses Bild wird nach dem Quiz und in der Trainerliste angezeigt.</p>
-            <label className="inline-flex items-center bg-slate-800 hover:bg-slate-700 border border-slate-700 text-emerald-400 px-3 py-2 rounded-xl text-xs font-semibold cursor-pointer">
+            <p className="text-xs text-ink-muted">Sichtbar im Matching und in der Trainerliste.</p>
+            <label className="inline-flex items-center bg-surface-soft hover:bg-surface-hover border border-line-strong text-accent px-3 py-2 rounded-xl text-xs font-semibold cursor-pointer">
               {uploadingAvatar ? 'Lade hoch...' : trainer.avatar_url ? 'Profilbild ersetzen' : 'Profilbild hochladen'}
               <input
                 type="file"
@@ -136,9 +135,11 @@ export default function ProfileSection({ trainer, onChange }: Props) {
           <textarea value={bio} onChange={(e) => setBio(e.target.value)} rows={4} className={`${inputClass} resize-none`} />
         </div>
 
-        <button type="submit" disabled={saving} className={`w-full py-3.5 ${primaryButtonClass}`}>
-          {saving ? 'Speichere...' : 'Profil aktualisieren'}
-        </button>
+        <div className="flex justify-end">
+          <button type="submit" disabled={saving} className={`min-h-11 px-5 py-2.5 ${primaryButtonClass}`}>
+            {saving ? 'Speichere...' : 'Profil speichern'}
+          </button>
+        </div>
       </form>
     </SectionCard>
   );

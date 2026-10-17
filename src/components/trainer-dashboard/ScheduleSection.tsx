@@ -1,6 +1,6 @@
 'use client';
 
-import { Calendar as CalendarIcon, CalendarDays } from 'lucide-react';
+import { CalendarDays } from 'lucide-react';
 import type { Booking, TrainerSlot } from '@/lib/trainer-dashboard/types';
 import BookingRequests from './BookingRequests';
 import SlotCalendar from './SlotCalendar';
@@ -27,18 +27,14 @@ export default function ScheduleSection({
     <SectionCard>
       <SectionHeader
         icon={CalendarDays}
-        title="Terminkalender"
-        description="Verwaltung freier Termine, Verfügbarkeiten und Auslastung."
-      />
-
-      <div className="flex items-center gap-2 text-xs font-bold text-emerald-400">
-        <CalendarIcon size={14} /> Anfragen & Termine
-        {pendingCount > 0 && (
-          <span className="bg-emerald-500 text-slate-950 text-[10px] font-black px-1.5 py-0.5 rounded-full">
-            {pendingCount} neu
+        title="Verfügbarkeit & Termine"
+        description="Freie Zeiten festlegen und Buchungsanfragen bearbeiten."
+        actions={pendingCount > 0 ? (
+          <span className="rounded-full bg-accent px-2.5 py-1 text-xs font-bold text-primary-foreground">
+            {pendingCount} neue {pendingCount === 1 ? 'Anfrage' : 'Anfragen'}
           </span>
-        )}
-      </div>
+        ) : undefined}
+      />
 
       <BookingRequests bookings={activeBookings} onRespond={onRespond} />
       <SlotCalendar slots={slots} bookingBySlot={bookingBySlot} onToggle={onToggleSlot} />

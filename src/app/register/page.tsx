@@ -13,13 +13,13 @@ function RegisterSelection() {
           <div className="space-y-4" aria-label="Kontotyp auswählen">
             <Link
               href={withNext('/client/register', next)}
-              className="block w-full bg-emerald-500 hover:bg-emerald-600 text-slate-950 font-bold py-4 rounded-2xl text-sm transition shadow-lg shadow-emerald-500/20"
+              className="block w-full bg-accent hover:bg-accent-strong text-primary-foreground font-bold py-4 rounded-2xl text-sm transition"
             >
               Als Kunde registrieren
             </Link>
             <Link
               href="/trainer/register"
-              className="block w-full bg-slate-800 hover:bg-slate-700 text-white font-bold py-4 rounded-2xl text-sm transition border border-slate-700"
+              className="block w-full bg-surface-soft hover:bg-surface-hover text-ink font-bold py-4 rounded-2xl text-sm transition border border-line-strong"
             >
               Als Trainer registrieren
             </Link>
@@ -30,7 +30,7 @@ function RegisterSelection() {
 
 export default function RegisterSelectionPage() {
   return (
-    <Suspense fallback={<div className="min-h-screen bg-slate-950" />}>
+    <Suspense fallback={<div className="min-h-screen bg-canvas" />}>
       <RegisterSelection />
     </Suspense>
   );

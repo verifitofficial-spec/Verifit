@@ -6,7 +6,10 @@
     "dev": "next dev",
     "build": "next build",
     "start": "next start",
-    "lint": "eslint"
+    "lint": "eslint",
+    "test": "node --experimental-strip-types --test --test-isolation=none src/lib/matching.test.mjs src/lib/inquiryCore.test.mjs src/lib/leadMvpBoundary.test.mjs src/lib/leadMvpBaseline.test.mjs",
+    "test:db": "node supabase/tests/lead_mvp_baseline_runtime.mjs",
+    "test:all": "npm test && npm run test:db"
   },
   "dependencies": {
     "@stripe/stripe-js": "^9.15.0",
@@ -21,6 +24,7 @@
     "zod": "^4.6.5"
   },
   "devDependencies": {
+    "@electric-sql/pglite": "0.5.10",
     "@tailwindcss/postcss": "^4",
     "@types/node": "^20",
     "@types/react": "^19",

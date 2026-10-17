@@ -28,8 +28,8 @@ export default function SlotCalendar({ slots, bookingBySlot, onToggle }: Props) 
   }
 
   return (
-    <div className="space-y-6 pt-6 border-t border-slate-800/80">
-      <div className="bg-slate-950/60 p-6 rounded-2xl border border-slate-800/80 space-y-4">
+    <div className="space-y-6 pt-6 border-t border-line/80">
+      <div className="bg-canvas/60 p-6 rounded-2xl border border-line/80 space-y-4">
         <MonthNav year={year} month={month} onPrev={prev} onNext={next} />
         <WeekdayRow />
 
@@ -51,26 +51,26 @@ export default function SlotCalendar({ slots, bookingBySlot, onToggle }: Props) 
                 onClick={() => setSelectedDate(dateStr)}
                 className={`h-12 rounded-xl text-xs font-bold transition flex flex-col items-center justify-center gap-0.5 cursor-pointer border ${
                   isSelected
-                    ? 'bg-emerald-500 text-slate-950 border-emerald-500 shadow-lg shadow-emerald-500/20 scale-105 z-10'
+                    ? 'bg-accent text-primary-foreground border-accent shadow-lg shadow-none scale-105 z-10'
                     : hasSlots
-                    ? 'bg-emerald-500/10 text-emerald-400 border-emerald-500/30 hover:border-emerald-500/60'
-                    : 'bg-slate-900 text-slate-300 border-slate-800/80 hover:border-slate-700 hover:text-white'
+                    ? 'bg-accent-soft text-accent border-accent/45 hover:border-accent/60'
+                    : 'bg-surface text-ink-soft border-line/80 hover:border-line-strong hover:text-ink'
                 }`}
               >
                 <span>{day}</span>
-                {hasSlots && !isSelected && <span className="w-1.5 h-1.5 rounded-full bg-emerald-400" />}
+                {hasSlots && !isSelected && <span className="w-1.5 h-1.5 rounded-full bg-accent-strong" />}
               </button>
             );
           })}
         </div>
       </div>
 
-      <div className="bg-slate-950/60 p-6 rounded-2xl border border-slate-800/80 space-y-4">
-        <div className="flex justify-between items-center border-b border-slate-800/80 pb-3">
-          <span className="text-xs font-bold text-slate-300 uppercase tracking-wider">
-            Stunden für: <span className="text-emerald-400">{selectedDate}</span>
+      <div className="bg-canvas/60 p-6 rounded-2xl border border-line/80 space-y-4">
+        <div className="flex justify-between items-center border-b border-line/80 pb-3">
+          <span className="text-xs font-bold text-ink-soft uppercase tracking-wider">
+            Stunden für: <span className="text-accent">{selectedDate}</span>
           </span>
-          <span className="text-xs text-slate-400">Klicke auf eine Stunde zum Freigeben</span>
+          <span className="text-xs text-ink-muted">Klicke auf eine Stunde zum Freigeben</span>
         </div>
 
         <FeedbackBox feedback={feedback} />
@@ -82,12 +82,12 @@ export default function SlotCalendar({ slots, bookingBySlot, onToggle }: Props) 
 
             const style =
               slot?.status === 'booked'
-                ? 'bg-amber-500/20 border-amber-500 text-amber-300'
+                ? 'bg-warning-soft border-warning-line text-warning'
                 : slot?.status === 'pending'
-                ? 'bg-blue-500/20 border-blue-500 text-blue-300'
+                ? 'bg-info-soft border-info-line text-info'
                 : slot?.status === 'free'
-                ? 'bg-emerald-500/20 border-emerald-500 text-emerald-300'
-                : 'bg-slate-900 border-slate-800 text-slate-400 hover:border-slate-700';
+                ? 'bg-accent-soft border-accent text-accent'
+                : 'bg-surface border-line text-ink-muted hover:border-line-strong';
             const label =
               slot?.status === 'booked' ? 'Gebucht' : slot?.status === 'pending' ? 'Angefragt' : slot?.status === 'free' ? 'Frei' : 'Inaktiv';
 
@@ -105,7 +105,7 @@ export default function SlotCalendar({ slots, bookingBySlot, onToggle }: Props) 
                 <span className="text-xs font-semibold">{label}</span>
                 {booking && (
                   <div
-                    className="w-full text-center text-xs text-slate-300 truncate"
+                    className="w-full text-center text-xs text-ink-soft truncate"
                     title={`${booking.client_name} · ${booking.offer_title}`}
                   >
                     {booking.client_name} · {booking.offer_title}

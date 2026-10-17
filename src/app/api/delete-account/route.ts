@@ -33,51 +33,24 @@ export async function POST(req: Request) {
   const admin = getAdminClient();
   const userId = authentication.user.id;
   const role = authentication.role;
-  const column = role === 'client' ? 'client_id' : 'trainer_id';
-  const today = new Date().toISOString().slice(0, 10);
 
-  const { data: bookings, error: bookingsError } = await admin
-    .from('bookings')
-    .select('id, slot_id, status, price, slot_date')
-    .eq(column, userId)
-    .in('status', ['pending', 'accepted', 'confirmed']);
-
-  if (bookingsError) {
-    console.error('Buchungen für Kontolöschung konnten nicht geladen werden');
-    return NextResponse.json({ error: 'Das Konto konnte nicht gelöscht werden.' }, { status: 500 });
-  }
-
-  // Bezahlte, zukünftige Termine müssen zuerst regulär storniert werden (Refund-Regeln).
-  const blocking = (bookings ?? []).filter(
-    (b) => b.status === 'confirmed' && Number(b.price) > 0 && String(b.slot_date) >= today
-  );
-  if (blocking.length > 0) {
+  // Kontaktanfragen enthalten personenbezogene Momentaufnahmen. Solange dafür
+  // kein freigegebenes Lösch-/Aufbewahrungskonzept vorliegt, muss die Datenbank
+  // die Löschung vor jeder destruktiven Storage- oder Auth-Aktion freigeben.
+  const { error: deletionCheckError } = await admin.rpc('assert_user_deletion_allowed', { p_user_id: userId });
+  if (deletionCheckError) {
+    console.error('Kontolöschung wurde durch die Datenbank-Vorprüfung abgelehnt');
+    const retentionDecisionRequired = deletionCheckError.message.includes(
+      'ACCOUNT_DELETION_REQUIRES_INQUIRY_RETENTION_DECISION'
+    );
     return NextResponse.json(
       {
-        error:
-          'Es gibt noch bezahlte, bevorstehende Termine. Bitte storniere diese zuerst (Rückerstattung gemäß Stornoregeln) und lösche dein Konto danach.',
+        error: retentionDecisionRequired
+          ? 'Das Konto kann derzeit nicht automatisch gelöscht werden, weil Kontaktanfragen vorhanden sind. Bitte kontaktiere den Support.'
+          : 'Das Konto konnte nicht für die Löschung geprüft werden.',
       },
-      { status: 409 }
+      { status: retentionDecisionRequired ? 409 : 500 }
     );
-  }
-
-  // Offene Anfragen, unbezahlte Zusagen und zukünftige kostenlose Termine werden storniert.
-  const toCancel = (bookings ?? []).filter(
-    (b) => b.status === 'pending' || b.status === 'accepted' || String(b.slot_date) >= today
-  );
-  if (toCancel.length > 0) {
-    const { error: cancelError } = await admin
-      .from('bookings')
-      .update({ status: 'cancelled', cancelled_at: new Date().toISOString() })
-      .in('id', toCancel.map((b) => b.id));
-    if (cancelError) {
-      console.error('Buchungen konnten vor der Kontolöschung nicht storniert werden');
-      return NextResponse.json({ error: 'Offene Buchungen konnten nicht storniert werden.' }, { status: 500 });
-    }
-    const slotIds = toCancel.map((b) => b.slot_id).filter((id): id is string => Boolean(id));
-    if (slotIds.length > 0) {
-      await admin.from('trainer_slots').update({ status: 'free' }).in('id', slotIds).in('status', ['pending', 'booked']);
-    }
   }
 
   if (role === 'trainer') {
@@ -89,6 +62,9 @@ export async function POST(req: Request) {
     }
   }
 
+  // Die RPC ist die atomare Datenbank-Löschgrenze für alle freigegebenen MVP-Datensätze.
+  // Bei einem Fehler bleibt der Auth-Nutzer bestehen, damit keine verwaisten
+  // personenbezogenen Datensätze unbemerkt zurückbleiben.
   const { error: deleteDataError } = await admin.rpc('delete_user_data', { p_user_id: userId });
   if (deleteDataError) {
     console.error('Nutzerdaten konnten nicht gelöscht werden:', deleteDataError.message);

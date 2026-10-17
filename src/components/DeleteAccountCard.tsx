@@ -50,45 +50,45 @@ export default function DeleteAccountCard({ role }: { role: 'client' | 'trainer'
   }
 
   return (
-    <div className="bg-slate-900 border border-red-500/20 rounded-3xl p-8 shadow-2xl space-y-4">
+    <div className="bg-surface border border-danger-line rounded-3xl p-8 shadow-2xl space-y-4">
       <div>
-        <h2 className="text-xl font-extrabold mb-1 text-red-400">Konto löschen</h2>
-        <p className="text-slate-400 text-sm">
+        <h2 className="text-xl font-extrabold mb-1 text-danger">Konto löschen</h2>
+        <p className="text-ink-muted text-sm">
           {role === 'client'
-            ? 'Dein Konto und alle deine Daten (Profil, Tracking, Pläne, Nachrichten) werden unwiderruflich gelöscht. Offene Anfragen werden storniert. Buchungsbelege bleiben anonymisiert erhalten.'
-            : 'Dein Trainerprofil, deine Angebote, Termine, Dokumente, Pläne und Nachrichten werden unwiderruflich gelöscht. Offene Anfragen werden storniert. Buchungsbelege bleiben anonymisiert erhalten. Dein Stripe-Konto bleibt bei Stripe bestehen.'}
+            ? 'Dein Konto, dein Profil und deine zugehörigen personenbezogenen Daten werden unwiderruflich gelöscht. Kontaktanfragen werden nach dem festgelegten Lösch- und Aufbewahrungskonzept verarbeitet.'
+            : 'Dein Konto, dein Trainerprofil, deine Angebote, Verifizierungsdokumente und zugehörigen personenbezogenen Daten werden unwiderruflich gelöscht. Kontaktanfragen werden nach dem festgelegten Lösch- und Aufbewahrungskonzept verarbeitet.'}
         </p>
       </div>
 
       {error && (
-        <div className="p-3 bg-red-500/10 border border-red-500/20 rounded-xl text-red-400 text-xs">{error}</div>
+        <div className="p-3 bg-danger-soft border border-danger-line rounded-xl text-danger text-xs">{error}</div>
       )}
 
       {!open ? (
         <button
           type="button"
           onClick={() => setOpen(true)}
-          className="flex items-center gap-2 bg-red-500/10 hover:bg-red-500/20 border border-red-500/30 text-red-400 font-bold px-4 py-2.5 rounded-xl text-xs transition cursor-pointer"
+          className="flex items-center gap-2 bg-danger-soft hover:bg-danger-soft border border-danger-line text-danger font-bold px-4 py-2.5 rounded-xl text-xs transition cursor-pointer"
         >
           <Trash2 size={14} /> Konto löschen
         </button>
       ) : (
         <div className="space-y-3">
-          <label className="block text-xs text-slate-400">
-            Tippe zur Bestätigung <strong className="text-white">{CONFIRM_WORD}</strong> ein:
+          <label className="block text-xs text-ink-muted">
+            Tippe zur Bestätigung <strong className="text-ink">{CONFIRM_WORD}</strong> ein:
           </label>
           <input
             type="text"
             value={confirmText}
             onChange={(e) => setConfirmText(e.target.value)}
-            className="w-full max-w-xs bg-slate-950 border border-slate-800 rounded-xl px-4 py-2.5 text-sm text-white focus:outline-none focus:border-red-500"
+            className="w-full max-w-xs bg-canvas border border-line rounded-xl px-4 py-2.5 text-sm text-ink focus:outline-none focus:border-danger-line"
           />
           <div className="flex gap-2">
             <button
               type="button"
               disabled={busy || confirmText !== CONFIRM_WORD}
               onClick={handleDelete}
-              className="bg-red-500 hover:bg-red-600 text-white font-bold px-4 py-2.5 rounded-xl text-xs transition cursor-pointer disabled:opacity-40 disabled:cursor-not-allowed"
+              className="bg-danger-strong hover:brightness-90 text-danger-foreground font-bold px-4 py-2.5 rounded-xl text-xs transition cursor-pointer disabled:opacity-40 disabled:cursor-not-allowed"
             >
               {busy ? 'Lösche...' : 'Endgültig löschen'}
             </button>
@@ -100,7 +100,7 @@ export default function DeleteAccountCard({ role }: { role: 'client' | 'trainer'
                 setConfirmText('');
                 setError('');
               }}
-              className="bg-slate-800 hover:bg-slate-700 border border-slate-700 text-slate-300 font-bold px-4 py-2.5 rounded-xl text-xs transition cursor-pointer"
+              className="bg-surface-soft hover:bg-surface-hover border border-line-strong text-ink-soft font-bold px-4 py-2.5 rounded-xl text-xs transition cursor-pointer"
             >
               Abbrechen
             </button>

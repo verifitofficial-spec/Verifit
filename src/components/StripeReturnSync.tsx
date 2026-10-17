@@ -78,8 +78,8 @@ export default function StripeReturnSync() {
     <div
       className={`p-3.5 rounded-xl text-xs font-medium border ${
         notice.type === 'ok'
-          ? 'bg-emerald-500/10 border-emerald-500/25 text-emerald-400'
-          : 'bg-amber-500/10 border-amber-500/25 text-amber-300'
+          ? 'bg-accent-soft border-accent/40 text-accent'
+          : 'bg-warning-soft border-warning-line text-warning'
       }`}
     >
       {notice.text}

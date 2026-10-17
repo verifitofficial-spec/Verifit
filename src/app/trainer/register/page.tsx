@@ -99,24 +99,24 @@ export default function TrainerRegisterPage() {
   }
 
   const inputClass = (error?: string) =>
-    `w-full bg-slate-950 border rounded-xl px-4 py-3 text-sm text-white focus:outline-none transition ${
-      error ? 'border-red-500/60 focus:border-red-500' : 'border-slate-800 focus:border-emerald-500'
+    `w-full bg-canvas border rounded-xl px-4 py-3 text-sm text-ink focus:outline-none transition ${
+      error ? 'border-danger-line focus:border-danger-line' : 'border-line focus:border-accent'
     }`;
-  const labelClass = 'block text-xs font-semibold text-slate-400 uppercase tracking-wider mb-2';
+  const labelClass = 'block text-xs font-semibold text-ink-muted uppercase tracking-wider mb-2';
 
   return (
     <AuthShell eyebrow="Trainer werden" title="Expertise, die sichtbar wird." description="Erstelle dein Profil. Nach der manuellen Prüfung kannst du passende Kunden begleiten." notes={['Manuelle Prüfung deiner Nachweise', 'Eigenes Profil und flexible Angebote', 'Klare Vermittlung ohne Leistungsversprechen']}>
 
           {errorMessage && (
-            <div className="mb-4 p-3 bg-red-500/10 border border-red-500/20 rounded-xl text-red-400 text-xs">
+            <div className="mb-4 p-3 bg-danger-soft border border-danger-line rounded-xl text-danger text-xs">
               {errorMessage}
             </div>
           )}
           {infoMessage && (
-            <div className="mb-4 p-3 bg-emerald-500/10 border border-emerald-500/20 rounded-xl text-emerald-400 text-xs leading-relaxed">
+            <div className="mb-4 p-3 bg-accent-soft border border-accent/35 rounded-xl text-accent text-xs leading-relaxed">
               {infoMessage}
               <div className="mt-2">
-                <Link href="/trainer/login" className="underline text-emerald-300">
+                <Link href="/trainer/login" className="underline text-accent">
                   Zum Login
                 </Link>
               </div>
@@ -151,7 +151,7 @@ export default function TrainerRegisterPage() {
                 placeholder="Erzähle kurz von deiner Erfahrung..."
                 value={bio}
                 onChange={(e) => setBio(e.target.value)}
-                className="w-full bg-slate-950 border border-slate-800 rounded-xl px-4 py-3 text-sm text-white focus:outline-none focus:border-emerald-500 resize-none h-20"
+                className="w-full bg-canvas border border-line rounded-xl px-4 py-3 text-sm text-ink focus:outline-none focus:border-accent resize-none h-20"
               />
             </div>
 
@@ -163,12 +163,12 @@ export default function TrainerRegisterPage() {
                   aria-describedby={fieldErrors.terms ? 'trainer-register-terms-error' : undefined}
                   checked={terms}
                   onChange={(e) => setTerms(e.target.checked)}
-                  className="mt-1 w-4 h-4 rounded border-slate-700 bg-slate-950 text-emerald-500 focus:ring-emerald-500 cursor-pointer"
+                  className="mt-1 w-4 h-4 rounded border-line-strong bg-canvas text-accent focus:ring-accent cursor-pointer"
                 />
-                <label htmlFor="trainerTerms" className="text-xs text-slate-400 leading-tight">
+                <label htmlFor="trainerTerms" className="text-xs text-ink-muted leading-tight">
                   Ich habe die{' '}
-                  <Link href="/agb" target="_blank" className="text-emerald-400 hover:underline">AGB</Link> und die{' '}
-                  <Link href="/datenschutz" target="_blank" className="text-emerald-400 hover:underline">Datenschutzerklärung</Link>{' '}
+                  <Link href="/agb" target="_blank" className="text-accent hover:underline">AGB</Link> und die{' '}
+                  <Link href="/datenschutz" target="_blank" className="text-accent hover:underline">Datenschutzerklärung</Link>{' '}
                   gelesen und akzeptiere sie. Mir ist bekannt, dass mein Profil erst nach manueller Prüfung durch VeriFit freigeschaltet wird.
                 </label>
               </div>
@@ -178,15 +178,15 @@ export default function TrainerRegisterPage() {
             <button
               type="submit"
               disabled={loading}
-              className="w-full bg-emerald-500 hover:bg-emerald-600 text-slate-950 font-bold py-3 rounded-xl text-sm transition shadow-lg shadow-emerald-500/20 cursor-pointer mt-2 disabled:opacity-60"
+              className="w-full bg-accent hover:bg-accent-strong text-primary-foreground font-bold py-3 rounded-xl text-sm transition shadow-lg shadow-none cursor-pointer mt-2 disabled:opacity-60"
             >
               {loading ? 'Registriere...' : 'Konto erstellen'}
             </button>
           </form>
 
-          <div className="mt-6 text-center text-xs text-slate-500">
+          <div className="mt-6 text-center text-xs text-ink-muted">
             Bereits ein Konto?{' '}
-            <Link href="/trainer/login" className="text-emerald-400 hover:underline">
+            <Link href="/trainer/login" className="text-accent hover:underline">
               Anmelden
             </Link>
           </div>

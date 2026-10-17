@@ -43,20 +43,20 @@ export default function StripeSection({ trainer }: { trainer: TrainerProfile }) 
 
   return (
     <SectionCard>
-      <div className="flex items-center justify-between gap-4">
+      <div className="flex flex-col justify-between gap-3 sm:flex-row sm:items-center">
         <div>
-          <h2 className="text-lg font-bold text-white">Stripe-Auszahlungen</h2>
-          <p className="text-slate-400 text-xs">
-            Verbinde dein Stripe-Testkonto, damit bezahlte Buchungen später ausgezahlt werden können.
+          <h2 className="text-lg font-bold text-ink">Auszahlungen</h2>
+          <p className="mt-0.5 text-sm text-ink-muted">
+            Stripe-Testkonto für bezahlte Buchungen.
           </p>
         </div>
-        <span className={`text-xs font-bold ${trainer.charges_enabled ? 'text-emerald-400' : 'text-amber-400'}`}>
+        <span className={`text-xs font-bold ${trainer.charges_enabled ? 'text-accent' : 'text-warning'}`}>
           {trainer.charges_enabled ? 'Aktiv' : 'Noch nicht eingerichtet'}
         </span>
       </div>
 
       {message && (
-        <div className="p-3 rounded-xl text-xs bg-red-500/10 border border-red-500/20 text-red-400">{message}</div>
+        <div className="p-3 rounded-xl text-xs bg-danger-soft border border-danger-line text-danger">{message}</div>
       )}
 
       <button

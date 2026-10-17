@@ -7,6 +7,46 @@ Dieses Dokument beschreibt **wie** VeriFit aussieht und sich verhält. Produktve
 - Marker: **Ist** = im Code belegt (mit Stand/Beleggrenze), **Empfehlung** = Gestaltungsregel dieses Zielsystems, **Entscheidung nötig** = braucht weiterhin eine gesonderte Gründerentscheidung. Weitere Marker: `AGENTS.md` §2.
 - **Freigegebene Gestaltungsrichtung:** Die UI soll gezielt von einem austauschbaren, generischen SaaS-/KI-Look zu einem hochwertigen, eigenständigen, modernen und professionellen VeriFit-Auftritt weiterentwickelt werden. Die folgenden Zielregeln sind der Auftrag für das Redesign. Das ist keine Freigabe, Backend, Geschäftslogik oder Datenmodell zu verändern.
 
+## Implementierter Theme-Stand (12.10.2026)
+
+Das semantische Theme-Fundament ist im aktuellen Code umgesetzt. Die ältere Bestandsaufnahme in Abschnitt 2 bleibt als Entstehungskontext erhalten; Aussagen wie „nur dunkles Theme“ beschreiben dort den Snapshot vom 11.10.2026 und nicht mehr den aktuellen Implementierungsstand.
+
+### Theme-Verhalten
+
+- VeriFit unterstützt `light` und `dark` als zwei Farbvarianten derselben Komponentenstruktur.
+- Beim ersten Besuch gilt die Systemeinstellung über `prefers-color-scheme`. Eine aktive Auswahl wird unter `verifit-theme` in `localStorage` gespeichert und bei späteren Besuchen sowie Seitenwechseln wiederverwendet.
+- Ein kurzes Inline-Skript im Root-Layout setzt `data-theme` vor dem ersten Paint. `ThemeProvider` synchronisiert React, das DOM, Systemänderungen ohne gespeicherte Auswahl und Änderungen in anderen Tabs.
+- Der Umschalter besitzt ein zustandsabhängiges zugängliches Label („Dunkles Design aktivieren“ bzw. „Helles Design aktivieren“) und ist in öffentlicher Navigation, Auth-Hülle, App-Shell, Admin, Quiz, Trainerprofil und Footer erreichbar.
+- Das Theme bleibt eine reine Darstellungspräferenz. Es ändert keine Rolle, Authentifizierung, Datenabfrage oder Geschäftsregel.
+
+### Semantische Tokens
+
+Die Quelle der Wahrheit ist `src/app/globals.css`. Komponenten verwenden die über Tailwind v4 bereitgestellten semantischen Klassen; rohe Slate-/White-Farbklassen sind in der Anwendungsoberfläche nicht mehr die Grundlage.
+
+| Rolle | CSS-Variable | Tailwind-Klasse (Beispiele) | Verwendung |
+|---|---|---|---|
+| Seitenfläche | `--background` | `bg-canvas` | Seiten, ruhige Unterflächen |
+| Primärtext | `--foreground` | `text-ink` | Überschriften, Hauptinhalte |
+| Sekundär-/Hinweistext | `--ink-soft`, `--ink-muted` | `text-ink-soft`, `text-ink-muted` | Fließtext, Metadaten |
+| Flächenhierarchie | `--surface`, `--surface-raised`, `--surface-soft`, `--surface-hover` | `bg-surface`, `bg-surface-raised`, `bg-surface-soft` | Karten, Eingaben, Hover |
+| Linien | `--line`, `--line-strong` | `border-line`, `border-line-strong` | Trennung, Bedienelemente |
+| Marke/Aktion | `--accent`, `--accent-strong`, `--accent-soft` | `bg-accent`, `text-accent`, `bg-accent-soft` | Primäraktionen, verifiziert/bestätigt |
+| Primärbutton-Text | `--primary-foreground` | `text-primary-foreground` | kontrastierender Text auf `bg-accent` |
+| Status | `--danger-*`, `--warning-*`, `--info-*` | `text-danger`, `bg-warning-soft`, `border-info-line` | Fehler, Warnung, Information |
+| Dialog-Overlay | `--overlay` | `bg-overlay` | Modale Hintergrundfläche |
+| Diagramme | `--chart-*` | Verwendung im SVG über `var(...)` | Datenlinien, Achsen, Raster, Punkte |
+
+Neue oder angefasste Komponenten verwenden diese Rollen statt einer themeabhängigen Farbnummer. Statusfarben bleiben zusätzlich immer als Text verständlich. Emerald ist in der Light-Palette bewusst dunkler als im Dark Mode, damit kleiner Text und Fokuszustände ausreichend kontrastieren.
+
+### Komponenten- und Qualitätsregeln
+
+- Primäraktionen: `bg-accent hover:bg-accent-strong text-primary-foreground`.
+- Sekundäraktionen: `bg-surface` oder `bg-surface-soft`, `border-line(-strong)`, Text `text-ink(-soft)`.
+- Eingaben: mindestens `border-line-strong`; der globale `focus-visible`-Ring verwendet `--accent`.
+- Karten erhalten eine Oberfläche nur bei funktionaler Gruppierung. Abschnittstrennung darf weiterhin ausschließlich über `border-line` und Abstand erfolgen.
+- Native Eingaben folgen über `color-scheme` dem aktiven Theme. Reduzierte Bewegung wird global berücksichtigt.
+- Diagramme behalten eine Kennzahl pro Grafik. `null`-Messwerte werden herausgefiltert, nicht als `0` gezeichnet. Einheiten, feste Skalen für 1–10-Werte sowie Empty States bleiben erhalten; Achsen, Raster und Punktfüllung sind themeabhängig.
+
 ## 1. Designrichtung: „Geprüft, nicht dekoriert“
 
 ### Markencharakter
@@ -50,9 +90,9 @@ Dieses Zielsystem autorisiert eine deutlichere visuelle Überarbeitung der beste
 
 ## 2. Ist-Zustand (belegt)
 
-### 2.1 Grundlagen
+### 2.1 Grundlagen (historischer Snapshot vom 11.10.2026)
 
-- Dunkles Theme ohne Umschalter. `globals.css` definiert nur `--background: #020617`, `--foreground: #ffffff` und mappt sie plus Schriften in `@theme inline`. Komponenten nutzen fast ausschließlich rohe Palettenklassen (`bg-slate-950`, `text-emerald-400`), nicht die Tokens. Es gibt **keine** semantischen Tokens für Flächen, Linien, Text, Akzent oder Status.
+- Zum damaligen Snapshot bestand ein dunkles Theme ohne Umschalter. Dieser Befund ist durch den oben dokumentierten Implementierungsstand vom 12.10.2026 überholt.
 - Schrift: Geist Sans und Geist Mono über `next/font` (Standard von `create-next-app`, keine bewusste Markenentscheidung dokumentiert). Geist Mono wird in den Snapshot-Dateien nicht verwendet. `<html lang="de">` ist gesetzt. Kein `color-scheme: dark` (native Datums-/Zeitfelder und Auswahllisten können hell erscheinen).
 - Tailwind v4 (`@tailwindcss/postcss`), kein `tailwind.config`, Standard-Breakpoints (`sm`, `md`, `lg`). Icons: `lucide-react` (Trainer-Dashboard, Admin, Navigation).
 - Seitenaufbau: `<main className="min-h-screen bg-slate-950 text-white flex flex-col justify-between">` mit Header, Section, Footer. Globale `AppShell` (Seitenleiste ab `md`, untere Leiste mobil) für angemeldete Kunden/Trainer; ausgeblendet auf Auth-Seiten und `/admin`.
@@ -141,11 +181,11 @@ Dieses Zielsystem autorisiert eine deutlichere visuelle Überarbeitung der beste
 
 **Zu bewahren (konsistent und tragfähig):** dunkle Slate-Basis mit Emerald-Akzent, der Primärbutton, deutsche Fehler-/Erfolgsboxen, `FormFieldError`, Skeletons passend zur Seitenstruktur (`loading.tsx`), `TrendChart` (zweckgebunden, zugänglich benannt), Statustexte neben Farben, `?next=`-Rücksprung, die gemeinsame Fachgebiets-Taxonomie.
 
-## 3. Semantische Farbrollen und Tokens (Zielsystem; Ist-Klassen in Klammern)
+## 3. Semantische Farbrollen und Tokens
 
-Führe die Rollen schrittweise als CSS-Variablen/`@theme`-Tokens ein (z. B. `--color-surface`, `--color-surface-raised`, `--color-line`, `--color-ink`, `--color-ink-muted`, `--color-accent`, `--color-danger`, `--color-warning`, `--color-info`). Baue neue bzw. angefasste UI darauf auf und migriere bestehende Flächen kontrolliert – keine ungetestete Massenersetzung. Die Bestandsaufnahme §2.1 beschreibt den früheren Snapshot; den heutigen Stand zuerst im Code prüfen.
+Diese Rollen sind als CSS-Variablen und Tailwind-`@theme`-Tokens implementiert. Neue und angefasste UI baut darauf auf. Die Bestandsaufnahme §2.1 beschreibt den früheren Snapshot; für konkrete Werte gilt immer `src/app/globals.css`.
 
-| Rolle | Bedeutung | Ist-Klasse |
+| Rolle | Bedeutung | frühere Referenzklasse |
 |---|---|---|
 | Fläche Seite / angehoben | Hintergrund / Gruppe | `slate-950` / `slate-900` |
 | Linie | Trennung, Rand | `slate-800` (Eingabefelder: stärker, §6) |

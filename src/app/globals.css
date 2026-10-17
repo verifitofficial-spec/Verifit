@@ -1,16 +1,86 @@
 @import "tailwindcss";
 
 :root {
+  --background: #f4f7f5;
+  --foreground: #122019;
+  --surface: #ffffff;
+  --surface-raised: #f8faf9;
+  --surface-soft: #eaf0ed;
+  --surface-hover: #e2ebe6;
+  --line: #d5dfda;
+  --line-strong: #9aaba2;
+  --ink-soft: #34463d;
+  --ink-muted: #617269;
+  --accent: #047857;
+  --accent-strong: #065f46;
+  --accent-soft: #dff7ec;
+  --primary-foreground: #ecfdf5;
+  --danger: #b42318;
+  --danger-strong: #b91c1c;
+  --danger-foreground: #ffffff;
+  --danger-soft: #fff0ee;
+  --danger-line: #f3b5ad;
+  --warning: #92400e;
+  --warning-soft: #fff7df;
+  --warning-line: #e9c979;
+  --info: #075985;
+  --info-soft: #e6f5fb;
+  --info-line: #9bd5e9;
+  --overlay: rgb(15 23 42 / 72%);
+  --shadow-color: rgb(15 23 42 / 10%);
+  --chart-grid: #d5dfda;
+  --chart-axis: #617269;
+  --chart-point: #ffffff;
+  --chart-weight: #047857;
+  --chart-calories: #a16207;
+  --chart-water: #0369a1;
+  --chart-sleep: #6d28d9;
+  --chart-mood: #be185d;
+  --chart-health: #b91c1c;
+  --chart-motivation: #c2410c;
+  --control-knob: #ffffff;
+  color-scheme: light;
+}
+
+[data-theme='dark'] {
   --background: #020617;
   --foreground: #f8fafc;
   --surface: #0f172a;
   --surface-raised: #111c30;
   --surface-soft: #172033;
-  --line: #1e293b;
-  --line-strong: #475569;
+  --surface-hover: #1e293b;
+  --line: #263449;
+  --line-strong: #526278;
+  --ink-soft: #cbd5e1;
   --ink-muted: #94a3b8;
-  --accent: #10b981;
-  --accent-strong: #059669;
+  --accent: #34d399;
+  --accent-strong: #10b981;
+  --accent-soft: #073d31;
+  --primary-foreground: #022c22;
+  --danger: #f87171;
+  --danger-strong: #dc2626;
+  --danger-foreground: #ffffff;
+  --danger-soft: #3a151c;
+  --danger-line: #7f2834;
+  --warning: #fbbf24;
+  --warning-soft: #382810;
+  --warning-line: #76551b;
+  --info: #7dd3fc;
+  --info-soft: #0b2d42;
+  --info-line: #155779;
+  --overlay: rgb(2 6 23 / 82%);
+  --shadow-color: rgb(0 0 0 / 28%);
+  --chart-grid: #263449;
+  --chart-axis: #94a3b8;
+  --chart-point: #020617;
+  --chart-weight: #34d399;
+  --chart-calories: #fbbf24;
+  --chart-water: #38bdf8;
+  --chart-sleep: #a78bfa;
+  --chart-mood: #f472b6;
+  --chart-health: #f87171;
+  --chart-motivation: #fb923c;
+  --control-knob: #ffffff;
   color-scheme: dark;
 }
 
@@ -21,14 +91,32 @@
   --color-surface: var(--surface);
   --color-surface-raised: var(--surface-raised);
   --color-surface-soft: var(--surface-soft);
+  --color-surface-hover: var(--surface-hover);
   --color-line: var(--line);
   --color-line-strong: var(--line-strong);
   --color-ink: var(--foreground);
+  --color-ink-soft: var(--ink-soft);
   --color-ink-muted: var(--ink-muted);
   --color-accent: var(--accent);
   --color-accent-strong: var(--accent-strong);
+  --color-accent-soft: var(--accent-soft);
+  --color-primary-foreground: var(--primary-foreground);
+  --color-danger: var(--danger);
+  --color-danger-strong: var(--danger-strong);
+  --color-danger-foreground: var(--danger-foreground);
+  --color-danger-soft: var(--danger-soft);
+  --color-danger-line: var(--danger-line);
+  --color-warning: var(--warning);
+  --color-warning-soft: var(--warning-soft);
+  --color-warning-line: var(--warning-line);
+  --color-info: var(--info);
+  --color-info-soft: var(--info-soft);
+  --color-info-line: var(--info-line);
+  --color-overlay: var(--overlay);
+  --color-control-knob: var(--control-knob);
   --font-sans: var(--font-geist-sans);
   --font-mono: var(--font-geist-mono);
+  --shadow-panel: 0 18px 45px -28px var(--shadow-color);
 }
 
 body {
@@ -38,6 +126,20 @@ body {
   text-rendering: optimizeLegibility;
 }
 
+button,
+a,
+input,
+select,
+textarea {
+  -webkit-tap-highlight-color: transparent;
+}
+
+input,
+select,
+textarea {
+  color-scheme: inherit;
+}
+
 ::selection {
   background: color-mix(in srgb, var(--accent) 35%, transparent);
   color: var(--foreground);
@@ -45,7 +147,7 @@ body {
 
 /* Keep keyboard navigation visible even where a component only defines a hover state. */
 :where(a, button, input, select, textarea, [tabindex]):focus-visible {
-  outline: 2px solid var(--color-emerald-400) !important;
+  outline: 2px solid var(--accent) !important;
   outline-offset: 2px !important;
 }
 

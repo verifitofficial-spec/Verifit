@@ -2,6 +2,18 @@
 
 Dieses Dokument beschreibt **was** VeriFit für seine Nutzer leisten soll und **warum**. Technik: `docs/ARCHITECTURE.md`. Aussehen und UI-Regeln: `docs/DESIGN_SYSTEM.md`. Arbeitsregeln für Agenten: `AGENTS.md`.
 
+> **Aktiver Produktumfang seit 17.10.2026:** Das vorzeigbare Pilot-MVP ist ein
+> Lead-Marktplatz. Aktiv sind Trainerregistrierung, manuelle Verifizierung,
+> öffentliche Profile und Angebote, Quiz/Matching sowie unverbindliche
+> Kontaktanfragen mit Bearbeitungsstatus. Termin-Slots, Buchungen, Checkout,
+> Stripe Connect, Chat, Pläne und Tracking gehören nicht zu diesem MVP. Die
+> entsprechenden Route Handler antworten bei direktem Aufruf mit HTTP 410.
+> Spätere Abschnitte zu diesen Funktionen dokumentieren den langfristigen
+> Zielzustand beziehungsweise Legacy-Code und sind kein Nachweis aktiver
+> Pilotfunktionalität.
+> Der aktuelle Beleg- und Freigabestand einschließlich Go/No-Go-Gates steht in
+> `docs/lead-mvp-pilot-readiness.md`.
+
 - Stand: 11.10.2026. Quellen: `docs/masterplan.md`, `docs/release-plan.md`, `docs/payment-flow.md`, Code-Snapshot, `README-ZUERST-LESEN.md`. Es gab keinen weiteren gespeicherten Gesprächskontext; Entscheidungen stammen nur aus diesen Quellen.
 - Marker (**bestätigt**, **Export**, **Entscheidung**, **geplant**, **offen**): Definition in `AGENTS.md` §2. Geschäftsregeln werden hier nicht neu erfunden; fehlende Regeln stehen unter §9 als offen.
 
@@ -23,8 +35,8 @@ Rollen liegen in `profiles.role`: `client` (Kunde), `trainer`, `admin`. Dieselbe
 
 | Rolle | Ziel | Wichtigste Fähigkeiten (Soll) |
 |---|---|---|
-| Kunde | Passenden Trainer finden, buchen, trainieren | Quiz, Trainerprofile, Buchungsanfrage, Zahlung, Storno, Dashboard, Pläne, Tracking, Datenfreigabe, Chat, Konto löschen |
-| Trainer | Kunden gewinnen und betreuen | Registrierung, Verifizierungsunterlagen, Profil, Fachgebiete, Angebote, Termine, Anfragen beantworten, Stripe-Onboarding, Planer, Kundenübersicht, Chat, Konto löschen |
+| Kunde | Passenden Trainer finden und unverbindlich kontaktieren | Quiz, Trainerprofile, Kontaktanfragen, Bearbeitungsstatus, Konto löschen |
+| Trainer | Sichtbar werden und Leads bearbeiten | Registrierung, Verifizierungsunterlagen, Profil, Fachgebiete, Angebote, Kontaktanfragen bearbeiten, Konto löschen |
 | Admin | Qualität der Plattform sichern | Trainer prüfen (Dokumente einsehen), freigeben/ablehnen |
 
 ### 2.1 Datenzugriff (Soll-Matrix, **Entscheidung** aus `docs/release-plan.md` §3)
@@ -48,7 +60,7 @@ Rollen liegen in `profiles.role`: `client` (Kunde), `trainer`, `admin`. Dieselbe
 
 1. **Trainer-Onboarding:** `/trainer/register` (Name, E-Mail, Passwort, Kurzbio, AGB/Datenschutz) → Status `pending` → E-Mail bestätigen → Dashboard: Profil, Fachgebiete, Lizenznummer, Versicherungsablauf, zwei PDFs (Lizenz, Haftpflicht) → Admin prüft → `approved`/`rejected` + Mail → bei `approved` buchbar und im Matching sichtbar.
 2. **Kunden-Onboarding:** `/client/register` (inkl. ausdrücklicher Einwilligung Art. 9 DSGVO und AGB/Datenschutz) → E-Mail bestätigen → Login → Dashboard.
-3. **Finden:** `/quiz` (Erfahrung, Ziel, Trainingsform, Budget) → Trefferliste → `/trainer/[id]` (Profil, Angebote, freie Termine); Alternativ `/trainer/list` mit Filtern Stadt/Fachgebiet.
+3. **Finden:** `/quiz` (Erfahrung, Ziel, Trainingsform, betreute Einheiten pro Monat, Monatsbudget) → Trefferliste → `/trainer/[id]` (Profil, Angebote, freie Termine); Alternativ `/trainer/list` mit Filtern Stadt/Fachgebiet.
 4. **Buchen:** Paket wählen → Termin wählen → Login (mit `?next=`-Rücksprung, Auswahl bleibt erhalten) → Anfrage senden → Trainer antwortet (Soll: innerhalb 24 h) → kostenlos: bestätigt; bezahlt: „Zahlung ausstehend“ mit 24 h Frist → Kunde zahlt über Stripe → bestätigt, Slot gebucht, Mails an beide.
 5. **Betreuen:** Trainer erstellt Trainings-/Ernährungsplan für einen Kunden → Kunde sieht Pläne im Dashboard, trackt täglich Werte; Trainer sieht Daten nur bei Freigabe.
 6. **Kommunizieren:** Chat Kunde ↔ Trainer (Realtime).
@@ -86,9 +98,9 @@ Spalte „Ist“: **bestätigt** = im Code-Snapshot vorhanden; Details nur wo re
 
 | ID | Anforderung | Ist | Akzeptanzkriterium |
 |---|---|---|---|
-| FR-MATCH-1 | Quiz mit Erfahrung, Ziel, Trainingsform, Budget; Ziele aus der gemeinsamen Fachgebiets-Taxonomie (`src/lib/constants.ts`); nicht verfügbare Ziele sind deaktiviert | bestätigt | Jedes wählbare Ziel liefert mindestens einen Treffer, wenn ein Trainer es führt |
+| FR-MATCH-1 | Quiz mit Erfahrung, Ziel, Trainingsform, betreuten Einheiten pro Monat und Monatsbudget; Ziele aus der gemeinsamen Fachgebiets-Taxonomie (`src/lib/constants.ts`) | lokal implementiert; neue Metadaten benötigen Migration `20261011170000…` | Ergebnisse verwenden ausschließlich explizite Trainer-/Angebotsdaten; fehlende Angaben gelten nicht als Match; Pakete ohne Laufzeit erhalten keinen scheinbar exakten Monatsbetrag |
 | FR-MATCH-2 | Freie Termine werden angezeigt und priorisiert, **filtern aber nicht** | bestätigt (**Entscheidung** README; weicht von `masterplan` §2D ab, die einen Filter vorsah) | Trainer ohne freie Termine erscheinen mit Hinweis, nach Trainern mit Terminen |
-| FR-MATCH-3 | Erfahrungs-Filter über Spalte `target_levels` (statt Textsuche in Bio) | **geplant** (heute Heuristik auf Bio-Text) | – |
+| FR-MATCH-3 | Erfahrungs-Filter über Spalte `target_levels` (statt Textsuche in Bio) | lokal implementiert; Migration vorbereitet, nicht gegen Staging geprüft | Bestehende Profile ohne Angabe werden nicht automatisch als passend behandelt |
 | FR-MATCH-4 | Standort/Remote- und Philosophie-Frage | **geplant** | – |
 | FR-PROF-1 | Öffentliches Profil zeigt Kompetenz, Fachgebiete, Verifizierung, Angebote, freie Termine, Social-Links; Buchen nur eingeloggt | bestätigt (URL über `id`) | Ohne Login führt „Anfrage“ zu Login/Registrierung und danach zurück |
 | FR-PROF-2 | Öffentliche Daten enthalten **keine** E-Mail, Lizenznummer, Versicherungsablauf, Dokumentpfade | **offen** (SEC-4) | Anonyme Abfrage liefert nur die Whitelist-Spalten |
